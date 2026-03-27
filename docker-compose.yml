@@ -1,0 +1,27 @@
+services:
+  hitparade-dev:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    profiles:
+      - dev
+
+  hitparade:
+    build:
+      context: .
+      target: production
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - ORIGIN=http://localhost:3000
+    profiles:
+      - prod
