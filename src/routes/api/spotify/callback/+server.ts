@@ -1,0 +1,53 @@
+import { redirect } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import {
+	exchangeCode,
+	storeSession,
+	getSpotifyClient,
+	generateSessionId
+} from '$lib/server/spotify';
+import type { SpotifySession } from '$lib/server/spotify';
+
+export const GET: RequestHandler = async ({ url, cookies }) => {
+	const code = url.searchParams.get('code');
+	const state = url.searchParams.get('state');
+	const error = url.searchParams.get('error');
+	const storedState = cookies.get('spotify_oauth_state');
+
+	cookies.delete('spotify_oauth_state', { path: '/' });
+
+	if (error) {
+		redirect(303, '/?spotify_error=access_denied');
+	}
+
+	if (!code || !state || state !== storedState) {
+		redirect(303, '/?spotify_error=invalid_state');
+	}
+
+	let tokens;
+	try {
+		tokens = await exchangeCode(code);
+	} catch {
+		redirect(303, '/?spotify_error=token_exchange_failed');
+	}
+
+	const client = getSpotifyClient(tokens);
+	const profile = await client.currentUser.profile();
+
+	const sessionId = generateSessionId();
+	const session: SpotifySession = {
+		tokens,
+		userId: profile.id,
+		displayName: profile.display_name ?? profile.id
+	};
+	storeSession(sessionId, session);
+
+	cookies.set('spotify_session', sessionId, {
+		path: '/',
+		httpOnly: true,
+		sameSite: 'lax',
+		maxAge: 60 * 60 * 8
+	});
+
+	redirect(303, '/?spotify=connected');
+};
