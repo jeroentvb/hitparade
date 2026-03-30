@@ -51,7 +51,14 @@ Standard SvelteKit file-based routing under `src/routes/`. Shared code goes in `
 
 ## MCP Tools
 
+### Svelte/SvelteKit
+
 The Svelte MCP server is available. When working on Svelte/SvelteKit code:
+
 1. Use `list-sections` first to discover relevant documentation
 2. Use `get-documentation` to fetch the sections you need
 3. Use `svelte-autofixer` to validate any Svelte code before finalizing
+
+### Context7
+
+For Flowbite Svelte components, use the Context7 MCP server to get usage examples and API details.
