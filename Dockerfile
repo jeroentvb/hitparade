@@ -13,6 +13,11 @@ FROM deps AS build
 COPY . .
 RUN bun run build
 
+# Production dependencies only
+FROM base AS prod-deps
+COPY package.json bun.lock .npmrc ./
+RUN bun install --frozen-lockfile --production
+
 # Production: minimal image with just the build output
 FROM node:24-alpine AS production
 WORKDIR /app
@@ -20,8 +25,11 @@ ENV NODE_ENV=production
 ENV PORT=3000
 COPY --from=build /app/build ./build
 COPY --from=build /app/package.json ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/server.js ./
+COPY --from=build /app/socket-setup.js ./
 EXPOSE 3000
-CMD ["node", "build/index.js"]
+CMD ["node", "server.js"]
 
 # Dev: full dev environment with hot reload
 FROM deps AS dev
