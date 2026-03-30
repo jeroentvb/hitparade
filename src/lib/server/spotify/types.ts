@@ -9,3 +9,11 @@ export interface SpotifySession {
 	userId: string;
 	displayName: string;
 }
+
+export interface PlaylistSummary {
+	id: string;
+	name: string;
+	imageUrl: string | null;
+	trackCount: number;
+	owner: string;
+}
