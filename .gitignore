@@ -25,5 +25,6 @@ vite.config.ts.timestamp-*
 .idea
 .vscode
 
-docs/local
+docs
 prototype
+.claude
