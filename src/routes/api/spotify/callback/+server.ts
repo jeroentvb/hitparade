@@ -13,15 +13,17 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const state = url.searchParams.get('state');
 	const error = url.searchParams.get('error');
 	const storedState = cookies.get('spotify_oauth_state');
+	const returnTo = cookies.get('spotify_return_to') || '/';
 
 	cookies.delete('spotify_oauth_state', { path: '/' });
+	cookies.delete('spotify_return_to', { path: '/' });
 
 	if (error) {
-		redirect(303, '/?spotify_error=access_denied');
+		redirect(303, `${returnTo}${returnTo.includes('?') ? '&' : '?'}spotify_error=access_denied`);
 	}
 
 	if (!code || !state || state !== storedState) {
-		redirect(303, '/?spotify_error=invalid_state');
+		redirect(303, `${returnTo}${returnTo.includes('?') ? '&' : '?'}spotify_error=invalid_state`);
 	}
 
 	let tokens;
@@ -49,5 +51,5 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		maxAge: 60 * 60 * 8
 	});
 
-	redirect(303, '/?spotify=connected');
+	redirect(303, `${returnTo}${returnTo.includes('?') ? '&' : '?'}spotify=connected`);
 };

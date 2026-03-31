@@ -1,11 +1,12 @@
-import type { GameConfig, GameSession, Player } from './types.js';
+import type { GameConfig, GameSession, Player, Track } from './types.js';
 import { generateJoinCode } from './join-codes.js';
 
 const games = new Map<string, GameSession>();
 
 export function createGame(
 	config: GameConfig,
-	host: { socketId: string; nickname: string }
+	host: { socketId: string; nickname: string },
+	tracks: Track[] = []
 ): GameSession {
 	const code = generateJoinCode(games);
 	const hostPlayer: Player = {
@@ -20,7 +21,7 @@ export function createGame(
 		config,
 		host: hostPlayer,
 		players: [hostPlayer],
-		tracks: [],
+		tracks,
 		playedTrackUris: [],
 		currentRound: null,
 		status: 'lobby',
