@@ -5,3 +5,14 @@
 /* ... */
 @source '../../node_modules/flowbite-svelte/dist';
 @source '../../node_modules/flowbite-svelte-icons/dist';
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background-color: #0f172a;
+	color: #e2e8f0;
+}
