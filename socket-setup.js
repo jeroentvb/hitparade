@@ -1,12 +1,13 @@
 import { Server } from 'socket.io';
+import { generateScorecard } from './src/lib/server/game/scorecard.js';
 
 /**
  * @typedef {{
  *   code: string;
  *   status: string;
- *   config: { difficulty: string; playlistName: string; fuzzyThreshold: number; maxPlayers: number };
+ *   config: { difficulty: import('./src/lib/server/game/types.js').Difficulty; playlistName: string; fuzzyThreshold: number; maxPlayers: number };
  *   host: { socketId: string; nickname: string };
- *   players: Array<{ socketId: string; nickname: string }>;
+ *   players: Array<{ socketId: string; nickname: string; scorecard: any }>;
  * }} GameSession
  */
 
@@ -121,9 +122,15 @@ export function setupSocketIO(httpServer, gamesMap) {
 			}
 
 			session.status = 'playing';
-			io.to(code.toUpperCase()).emit('game-started', {
-				code: session.code
-			});
+			for (const player of session.players) {
+				player.scorecard = generateScorecard(session.config.difficulty);
+			}
+			for (const player of session.players) {
+				io.to(player.socketId).emit('game-started', {
+					code: session.code,
+					scorecard: player.scorecard
+				});
+			}
 			console.log(`[socket.io] game ${code} started`);
 			if (typeof callback === 'function') callback({ ok: true });
 		});

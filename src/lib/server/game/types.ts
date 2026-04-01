@@ -41,6 +41,8 @@ export interface ScorecardCell {
 	marked: boolean;
 }
 
+export type { CategoryName } from './scorecard.js';
+
 export type Scorecard = ScorecardCell[];
 
 export interface Player {
