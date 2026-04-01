@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Input, Label, Radio, Spinner, Alert } from 'flowbite-svelte';
-	import { SearchOutline, CheckCircleOutline } from 'flowbite-svelte-icons';
+	import { Alert, Button, Input, Label, Radio, Spinner } from 'flowbite-svelte';
+	import { CheckCircleOutline, SearchOutline } from 'flowbite-svelte-icons';
 
 	interface PlaylistSummary {
 		id: string;
@@ -305,22 +305,28 @@
 					/>
 				</div>
 			</section>
-
-			<!-- Create Game Button -->
-			<Button
-				color="purple"
-				size="xl"
-				class="w-full"
-				disabled={!canCreate || creating}
-				onclick={createGame}
-			>
-				{#if creating}
-					<Spinner size="4" class="me-2" />
-					Creating game...
-				{:else}
-					Create Game
-				{/if}
-			</Button>
 		{/if}
+
+		<div class="flex flex-col gap-3">
+			{#if spotifyConnected}
+				<!-- Create Game Button -->
+				<Button
+					color="purple"
+					size="xl"
+					class="w-full"
+					disabled={!canCreate || creating}
+					onclick={createGame}
+				>
+					{#if creating}
+						<Spinner size="4" class="me-2" />
+						Creating game...
+					{:else}
+						Create Game
+					{/if}
+				</Button>
+			{/if}
+
+			<Button href="/" size="xl" outline color="purple" class="w-full">Back</Button>
+		</div>
 	</div>
 </main>
