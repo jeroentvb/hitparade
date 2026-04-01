@@ -9,9 +9,21 @@ export type {
 	SubmittedAnswer,
 	TimerState,
 	RoundState,
-	GameSession
+	GameSession,
+	LobbyPlayer,
+	LobbyState
 } from './types.js';
 
-export { createGame, getGame, joinGame, removePlayer, cleanupStale, _resetStore } from './store.js';
+export {
+	createGame,
+	getGame,
+	joinGame,
+	removePlayer,
+	registerSocket,
+	startGame,
+	getLobbyState,
+	cleanupStale,
+	_resetStore
+} from './store.js';
 
 export { generateJoinCode } from './join-codes.js';

@@ -7,10 +7,14 @@ function socketPlugin(): Plugin {
 		name: 'socket-io-dev',
 		configureServer(server) {
 			if (!server.httpServer) return;
-			import('./socket-setup.js').then(({ setupSocketIO }) => {
-				setupSocketIO(server.httpServer as import('node:http').Server);
-				console.log('[vite] Socket.IO attached to dev server');
-			});
+			Promise.all([import('./socket-setup.js'), import('./src/lib/server/game/store.js')]).then(
+				([{ setupSocketIO }]) => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const gamesMap = (globalThis as any).__hitparade_games;
+					setupSocketIO(server.httpServer as import('node:http').Server, gamesMap);
+					console.log('[vite] Socket.IO attached to dev server');
+				}
+			);
 		}
 	};
 }

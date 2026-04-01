@@ -33,7 +33,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Spotify session expired' }, { status: 401 });
 	}
 
-	const { tracks } = await fetchPlaylistTracks(client, playlistId);
+	const [{ tracks }, playlist] = await Promise.all([
+		fetchPlaylistTracks(client, playlistId),
+		client.playlists.getPlaylist(playlistId)
+	]);
 
 	if (tracks.length === 0) {
 		return json({ error: 'Playlist has no playable tracks' }, { status: 400 });
@@ -43,11 +46,18 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		{
 			difficulty: difficulty as Difficulty,
 			fuzzyThreshold: threshold,
-			maxPlayers: 20
+			maxPlayers: 20,
+			playlistName: playlist.name
 		},
 		{ socketId: 'pending', nickname: nickname.trim() },
 		tracks
 	);
 
-	return json({ code: session.code });
+	const headers = new Headers();
+	headers.append(
+		'Set-Cookie',
+		`hp_player_nickname=${encodeURIComponent(nickname.trim())}; Path=/; HttpOnly; SameSite=Lax`
+	);
+
+	return json({ code: session.code }, { headers });
 };

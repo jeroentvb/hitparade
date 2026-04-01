@@ -1,7 +1,10 @@
-import type { GameConfig, GameSession, Player, Track } from './types.js';
+import type { GameConfig, GameSession, LobbyState, Player, Track } from './types.js';
 import { generateJoinCode } from './join-codes.js';
 
-const games = new Map<string, GameSession>();
+const games: Map<string, GameSession> =
+	((globalThis as Record<string, unknown>).__hitparade_games as Map<string, GameSession>) ??
+	new Map<string, GameSession>();
+(globalThis as Record<string, unknown>).__hitparade_games = games;
 
 export function createGame(
 	config: GameConfig,
@@ -100,6 +103,49 @@ export function cleanupStale(now: number = Date.now()): number {
 		}
 	}
 	return removed;
+}
+
+export function registerSocket(
+	code: string,
+	nickname: string,
+	socketId: string
+): Player | undefined {
+	const session = games.get(code.toUpperCase());
+	if (!session) return undefined;
+	const player = session.players.find((p) => p.nickname.toLowerCase() === nickname.toLowerCase());
+	if (!player) return undefined;
+	player.socketId = socketId;
+	return player;
+}
+
+export function startGame(code: string, socketId: string): GameSession {
+	const session = games.get(code.toUpperCase());
+	if (!session) throw new Error('Game not found');
+	if (session.host.socketId !== socketId) throw new Error('Only the host can start the game');
+	const connectedCount = session.players.filter((p) => p.socketId !== 'pending').length;
+	if (connectedCount < 2) throw new Error('Need at least 2 connected players');
+	session.status = 'playing';
+	return session;
+}
+
+export function getLobbyState(code: string): LobbyState | undefined {
+	const session = games.get(code.toUpperCase());
+	if (!session) return undefined;
+	return {
+		code: session.code,
+		status: session.status,
+		config: {
+			difficulty: session.config.difficulty,
+			playlistName: session.config.playlistName,
+			fuzzyThreshold: session.config.fuzzyThreshold,
+			maxPlayers: session.config.maxPlayers
+		},
+		players: session.players.map((p) => ({
+			nickname: p.nickname,
+			connected: p.socketId !== 'pending'
+		})),
+		hostNickname: session.host.nickname
+	};
 }
 
 export function _resetStore(): void {

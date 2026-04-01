@@ -5,6 +5,7 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			spotifySessionId: string | undefined;
+			playerNickname: string | undefined;
 		}
 		// interface PageData {}
 		// interface PageState {}

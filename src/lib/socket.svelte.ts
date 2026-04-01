@@ -47,3 +47,52 @@ export function leaveRoom(roomCode: string): void {
 export function sendToRoom(roomCode: string, event: string, data: unknown): void {
 	getSocket().emit('room-message', { roomCode, event, data });
 }
+
+export function registerPlayer(
+	code: string,
+	nickname: string,
+	callback?: (response: { ok: boolean; error?: string }) => void
+): void {
+	getSocket().emit('register-player', { code, nickname }, callback);
+}
+
+export function startGame(
+	code: string,
+	callback?: (response: { ok: boolean; error?: string }) => void
+): void {
+	getSocket().emit('start-game', { code }, callback);
+}
+
+export function onLobbyUpdate(handler: (data: LobbyUpdate) => void): void {
+	getSocket().on('lobby-update', handler);
+}
+
+export function offLobbyUpdate(handler: (data: LobbyUpdate) => void): void {
+	getSocket().off('lobby-update', handler);
+}
+
+export function onGameStarted(handler: (data: { code: string }) => void): void {
+	getSocket().on('game-started', handler);
+}
+
+export function offGameStarted(handler: (data: { code: string }) => void): void {
+	getSocket().off('game-started', handler);
+}
+
+interface LobbyPlayer {
+	nickname: string;
+	connected: boolean;
+}
+
+export interface LobbyUpdate {
+	code: string;
+	status: string;
+	config: {
+		difficulty: string;
+		playlistName: string;
+		fuzzyThreshold: number;
+		maxPlayers: number;
+	};
+	players: LobbyPlayer[];
+	hostNickname: string;
+}

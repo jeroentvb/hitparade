@@ -6,6 +6,25 @@ export interface GameConfig {
 	difficulty: Difficulty;
 	fuzzyThreshold: number;
 	maxPlayers: number;
+	playlistName: string;
+}
+
+export interface LobbyPlayer {
+	nickname: string;
+	connected: boolean;
+}
+
+export interface LobbyState {
+	code: string;
+	status: GameStatus;
+	config: {
+		difficulty: Difficulty;
+		playlistName: string;
+		fuzzyThreshold: number;
+		maxPlayers: number;
+	};
+	players: LobbyPlayer[];
+	hostNickname: string;
 }
 
 export interface Track {

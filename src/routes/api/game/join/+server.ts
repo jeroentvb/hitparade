@@ -12,7 +12,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		joinGame(code.trim(), { socketId: 'pending', nickname: nickname.trim() });
-		return json({ code: code.trim().toUpperCase() });
+
+		const headers = new Headers();
+		headers.append(
+			'Set-Cookie',
+			`hp_player_nickname=${encodeURIComponent(nickname.trim())}; Path=/; HttpOnly; SameSite=Lax`
+		);
+
+		return json({ code: code.trim().toUpperCase() }, { headers });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Failed to join game';
 		return json({ error: message }, { status: 400 });
