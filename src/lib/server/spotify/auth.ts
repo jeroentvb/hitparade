@@ -1,10 +1,10 @@
-import { SpotifyApi, type AccessToken } from '@spotify/web-api-ts-sdk';
+import { SpotifyApi, type IAuthStrategy, type AccessToken } from '@spotify/web-api-ts-sdk';
 import {
 	SPOTIFY_CLIENT_ID,
 	SPOTIFY_CLIENT_SECRET,
 	SPOTIFY_REDIRECT_URI
 } from '$env/static/private';
-import type { SpotifySession, SpotifyTokens } from './types.js';
+import type { SpotifySession } from './types.js';
 
 const sessions = new Map<string, SpotifySession>();
 
@@ -21,6 +21,62 @@ const SCOPES = [
 const TOKEN_ENDPOINT = 'https://accounts.spotify.com/api/token';
 const AUTHORIZE_ENDPOINT = 'https://accounts.spotify.com/authorize';
 
+class ServerAuthStrategy implements IAuthStrategy {
+	private token: AccessToken;
+
+	constructor(token: AccessToken) {
+		this.token = token;
+		if (!this.token.expires) {
+			this.token.expires = Date.now() + token.expires_in * 1000;
+		}
+	}
+
+	setConfiguration(): void {}
+
+	async getOrCreateAccessToken(): Promise<AccessToken> {
+		if (this.token.expires && this.token.expires <= Date.now()) {
+			this.token = await refreshWithSecret(this.token);
+		}
+		return this.token;
+	}
+
+	async getAccessToken(): Promise<AccessToken | null> {
+		return this.token;
+	}
+
+	removeAccessToken(): void {
+		this.token = { access_token: '', token_type: '', expires_in: 0, refresh_token: '' };
+	}
+}
+
+async function refreshWithSecret(token: AccessToken): Promise<AccessToken> {
+	const res = await fetch(TOKEN_ENDPOINT, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+			Authorization: `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`
+		},
+		body: new URLSearchParams({
+			grant_type: 'refresh_token',
+			refresh_token: token.refresh_token
+		})
+	});
+
+	if (!res.ok) {
+		const body = await res.text();
+		throw new Error(`Token refresh failed: ${res.status} ${body}`);
+	}
+
+	const data = await res.json();
+	return {
+		access_token: data.access_token,
+		token_type: 'Bearer',
+		expires_in: data.expires_in,
+		refresh_token: data.refresh_token ?? token.refresh_token,
+		expires: Date.now() + data.expires_in * 1000
+	};
+}
+
 export function generateAuthUrl(state: string): string {
 	const params = new URLSearchParams({
 		response_type: 'code',
@@ -32,7 +88,7 @@ export function generateAuthUrl(state: string): string {
 	return `${AUTHORIZE_ENDPOINT}?${params}`;
 }
 
-export async function exchangeCode(code: string): Promise<SpotifyTokens> {
+export async function exchangeCode(code: string): Promise<AccessToken> {
 	const res = await fetch(TOKEN_ENDPOINT, {
 		method: 'POST',
 		headers: {
@@ -53,36 +109,16 @@ export async function exchangeCode(code: string): Promise<SpotifyTokens> {
 
 	const data = await res.json();
 	return {
-		accessToken: data.access_token,
-		refreshToken: data.refresh_token,
-		expiresAt: Date.now() + data.expires_in * 1000
+		access_token: data.access_token,
+		token_type: 'Bearer',
+		expires_in: data.expires_in,
+		refresh_token: data.refresh_token,
+		expires: Date.now() + data.expires_in * 1000
 	};
 }
 
-async function refreshAccessToken(refreshToken: string): Promise<SpotifyTokens> {
-	const res = await fetch(TOKEN_ENDPOINT, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/x-www-form-urlencoded',
-			Authorization: `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`
-		},
-		body: new URLSearchParams({
-			grant_type: 'refresh_token',
-			refresh_token: refreshToken
-		})
-	});
-
-	if (!res.ok) {
-		const body = await res.text();
-		throw new Error(`Token refresh failed: ${res.status} ${body}`);
-	}
-
-	const data = await res.json();
-	return {
-		accessToken: data.access_token,
-		refreshToken: data.refresh_token ?? refreshToken,
-		expiresAt: Date.now() + data.expires_in * 1000
-	};
+export function createClient(token: AccessToken): SpotifyApi {
+	return new SpotifyApi(new ServerAuthStrategy(token));
 }
 
 export function storeSession(sessionId: string, session: SpotifySession): void {
@@ -97,27 +133,10 @@ export function removeSession(sessionId: string): void {
 	sessions.delete(sessionId);
 }
 
-export async function getValidTokens(sessionId: string): Promise<SpotifyTokens | undefined> {
+export function getClient(sessionId: string): SpotifyApi {
 	const session = sessions.get(sessionId);
-	if (!session) return undefined;
-
-	// Refresh if token expires within 60 seconds
-	if (Date.now() > session.tokens.expiresAt - 60_000) {
-		const refreshed = await refreshAccessToken(session.tokens.refreshToken);
-		session.tokens = refreshed;
-	}
-
-	return session.tokens;
-}
-
-export function getSpotifyClient(tokens: SpotifyTokens): SpotifyApi {
-	const accessToken: AccessToken = {
-		access_token: tokens.accessToken,
-		token_type: 'Bearer',
-		expires_in: Math.floor((tokens.expiresAt - Date.now()) / 1000),
-		refresh_token: tokens.refreshToken
-	};
-	return SpotifyApi.withAccessToken(SPOTIFY_CLIENT_ID, accessToken);
+	if (!session) throw new Error('Session not found');
+	return session.client;
 }
 
 export function generateSessionId(): string {

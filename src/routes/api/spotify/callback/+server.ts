@@ -1,11 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import {
-	exchangeCode,
-	storeSession,
-	getSpotifyClient,
-	generateSessionId
-} from '$lib/server/spotify';
+import { exchangeCode, createClient, storeSession, generateSessionId } from '$lib/server/spotify';
 import type { SpotifySession } from '$lib/server/spotify';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
@@ -26,19 +21,19 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		redirect(303, `${returnTo}${returnTo.includes('?') ? '&' : '?'}spotify_error=invalid_state`);
 	}
 
-	let tokens;
+	let token;
 	try {
-		tokens = await exchangeCode(code);
+		token = await exchangeCode(code);
 	} catch {
 		redirect(303, '/?spotify_error=token_exchange_failed');
 	}
 
-	const client = getSpotifyClient(tokens);
+	const client = createClient(token);
 	const profile = await client.currentUser.profile();
 
 	const sessionId = generateSessionId();
 	const session: SpotifySession = {
-		tokens,
+		client,
 		userId: profile.id,
 		displayName: profile.display_name ?? profile.id
 	};

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getValidTokens, getSpotifyClient, fetchUserPlaylists } from '$lib/server/spotify';
+import { getClient, fetchUserPlaylists } from '$lib/server/spotify';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const sessionId = locals.spotifySessionId;
@@ -8,13 +8,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 		return json({ error: 'Not authenticated' }, { status: 401 });
 	}
 
-	const tokens = await getValidTokens(sessionId);
-	if (!tokens) {
+	try {
+		const client = getClient(sessionId);
+		const playlists = await fetchUserPlaylists(client);
+		return json({ playlists });
+	} catch {
 		return json({ error: 'Session expired' }, { status: 401 });
 	}
-
-	const client = getSpotifyClient(tokens);
-	const playlists = await fetchUserPlaylists(client);
-
-	return json({ playlists });
 };

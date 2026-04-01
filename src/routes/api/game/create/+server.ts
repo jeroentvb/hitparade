@@ -2,22 +2,12 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { Difficulty } from '$lib/server/game/types.js';
 import { createGame } from '$lib/server/game';
-import {
-	getValidTokens,
-	getSpotifyClient,
-	fetchPlaylistTracks,
-	parsePlaylistId
-} from '$lib/server/spotify';
+import { getClient, fetchPlaylistTracks, parsePlaylistId } from '$lib/server/spotify';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const sessionId = locals.spotifySessionId;
 	if (!sessionId) {
 		return json({ error: 'Not authenticated with Spotify' }, { status: 401 });
-	}
-
-	const tokens = await getValidTokens(sessionId);
-	if (!tokens) {
-		return json({ error: 'Spotify session expired' }, { status: 401 });
 	}
 
 	const body = await request.json();
@@ -36,7 +26,13 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const threshold =
 		typeof fuzzyThreshold === 'number' ? Math.min(100, Math.max(0, fuzzyThreshold)) : 70;
 
-	const client = getSpotifyClient(tokens);
+	let client;
+	try {
+		client = getClient(sessionId);
+	} catch {
+		return json({ error: 'Spotify session expired' }, { status: 401 });
+	}
+
 	const { tracks } = await fetchPlaylistTracks(client, playlistId);
 
 	if (tracks.length === 0) {

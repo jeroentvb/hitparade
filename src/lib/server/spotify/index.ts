@@ -1,13 +1,13 @@
-export type { SpotifyTokens, SpotifySession, PlaylistSummary } from './types.js';
+export type { SpotifySession, PlaylistSummary } from './types.js';
 
 export {
 	generateAuthUrl,
 	exchangeCode,
+	createClient,
 	storeSession,
 	getSession,
 	removeSession,
-	getValidTokens,
-	getSpotifyClient,
+	getClient,
 	generateSessionId,
 	generateState
 } from './auth.js';

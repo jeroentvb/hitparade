@@ -1,11 +1,7 @@
-export interface SpotifyTokens {
-	accessToken: string;
-	refreshToken: string;
-	expiresAt: number;
-}
+import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
 
 export interface SpotifySession {
-	tokens: SpotifyTokens;
+	client: SpotifyApi;
 	userId: string;
 	displayName: string;
 }
