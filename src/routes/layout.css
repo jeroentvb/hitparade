@@ -1,9 +1,18 @@
 @import 'tailwindcss';
+@import 'flowbite/src/themes/default.css';
 @plugin '@tailwindcss/forms';
 @plugin 'flowbite/plugin';
 @custom-variant dark (&:where(.dark, .dark *));
 @source '../../node_modules/flowbite-svelte/dist';
 @source '../../node_modules/flowbite-svelte-icons/dist';
+
+@theme {
+	--color-brand-softer: var(--color-purple-50);
+	--color-brand-soft: var(--color-purple-100);
+	--color-brand: var(--color-purple-600);
+	--color-brand-medium: var(--color-purple-200);
+	--color-brand-strong: var(--color-purple-700);
+}
 
 html,
 body {
@@ -14,4 +23,12 @@ body {
 body {
 	background-color: #0f172a;
 	color: #e2e8f0;
+}
+
+.dark {
+	--color-brand-softer: var(--color-purple-950);
+	--color-brand-soft: var(--color-purple-900);
+	--color-brand: var(--color-purple-500);
+	--color-brand-medium: var(--color-purple-900);
+	--color-brand-strong: var(--color-purple-600);
 }
