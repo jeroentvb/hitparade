@@ -25,6 +25,8 @@ export {
 
 export { checkAnswer } from './answer-checker.js';
 
+export { checkBingo } from './bingo.js';
+
 export {
 	createGame,
 	getGame,
