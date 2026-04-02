@@ -12,10 +12,18 @@ export type {
 	GameSession,
 	LobbyPlayer,
 	LobbyState,
-	CategoryName
+	CategorySlug,
+	AnswerResult
 } from './types.js';
 
-export { generateScorecard, SIDE_A_CATEGORIES, SIDE_B_CATEGORIES } from './scorecard.js';
+export {
+	generateScorecard,
+	categoryName,
+	SIDE_A_CATEGORIES,
+	SIDE_B_CATEGORIES
+} from './scorecard.js';
+
+export { checkAnswer } from './answer-checker.js';
 
 export {
 	createGame,

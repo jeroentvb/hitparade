@@ -87,7 +87,7 @@ export async function fetchPlaylistTracks(
 				artists: spotifyTrack.artists.map((a) => a.name),
 				albumName: album.name,
 				releaseYear: parseInt(album.release_date.substring(0, 4), 10),
-				isGroup: spotifyTrack.artists.length > 1
+				multipleArtists: spotifyTrack.artists.length > 1
 			});
 		}
 

@@ -33,15 +33,17 @@ export interface Track {
 	artists: string[];
 	albumName: string;
 	releaseYear: number;
-	isGroup: boolean;
+	multipleArtists: boolean;
 }
 
+import type { CategorySlug } from './scorecard.js';
+
 export interface ScorecardCell {
-	category: string;
+	category: CategorySlug;
 	marked: boolean;
 }
 
-export type { CategoryName } from './scorecard.js';
+export type { CategorySlug } from './scorecard.js';
 
 export type Scorecard = ScorecardCell[];
 
@@ -66,10 +68,17 @@ export interface TimerState {
 
 export interface RoundState {
 	roundNumber: number;
-	selectedCategory: string | null;
+	selectedCategory: CategorySlug | null;
 	selectedTrack: Track | null;
 	timer: TimerState | null;
 	answers: SubmittedAnswer[];
+}
+
+export interface AnswerResult {
+	correct: boolean;
+	exactYear: boolean;
+	playerAnswer: string;
+	correctAnswer: string;
 }
 
 export interface GameSession {
