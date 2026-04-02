@@ -2,6 +2,8 @@ export type Difficulty = 'A' | 'B';
 
 export type GameStatus = 'lobby' | 'playing' | 'finished';
 
+export type RoundPhase = 'spin' | 'pre-play' | 'playing' | 'reveal' | 'cross-placement';
+
 export interface GameConfig {
 	difficulty: Difficulty;
 	fuzzyThreshold: number;
@@ -68,10 +70,12 @@ export interface TimerState {
 
 export interface RoundState {
 	roundNumber: number;
+	phase: RoundPhase;
 	selectedCategory: CategorySlug | null;
 	selectedTrack: Track | null;
 	timer: TimerState | null;
 	answers: SubmittedAnswer[];
+	results: Record<string, AnswerResult>;
 }
 
 export interface AnswerResult {
@@ -90,5 +94,8 @@ export interface GameSession {
 	playedTrackUris: string[];
 	currentRound: RoundState | null;
 	status: GameStatus;
+	hostDeviceId: string | null;
+	playTrack: ((trackUri: string, deviceId: string) => Promise<void>) | null;
+	pauseTrack: ((deviceId: string) => Promise<void>) | null;
 	createdAt: number;
 }

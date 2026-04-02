@@ -28,6 +28,9 @@ export function createGame(
 		playedTrackUris: [],
 		currentRound: null,
 		status: 'lobby',
+		hostDeviceId: null,
+		playTrack: null,
+		pauseTrack: null,
 		createdAt: Date.now()
 	};
 	games.set(code, session);

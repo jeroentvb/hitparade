@@ -8,6 +8,7 @@ export type {
 	Player,
 	SubmittedAnswer,
 	TimerState,
+	RoundPhase,
 	RoundState,
 	GameSession,
 	LobbyPlayer,

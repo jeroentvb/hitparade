@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { Difficulty } from '$lib/server/game/types.js';
 import { createGame } from '$lib/server/game';
-import { getClient, fetchPlaylistTracks, parsePlaylistId } from '$lib/server/spotify';
+import { getClient, fetchPlaylistTracks, parsePlaylistId, play, pause } from '$lib/server/spotify';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const sessionId = locals.spotifySessionId;
@@ -52,6 +52,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		{ socketId: 'pending', nickname: nickname.trim() },
 		tracks
 	);
+
+	session.playTrack = (trackUri, deviceId) => play(sessionId, trackUri, deviceId);
+	session.pauseTrack = (deviceId) => pause(sessionId, deviceId);
 
 	const headers = new Headers();
 	headers.append(
