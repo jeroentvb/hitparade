@@ -4,14 +4,14 @@
 	let {
 		category,
 		onsubmit,
-		disabled = false
+		disabled = false,
+		value = $bindable('')
 	}: {
 		category: { slug: string; name: string };
 		onsubmit: (answer: string) => void;
 		disabled?: boolean;
+		value?: string;
 	} = $props();
-
-	let textValue = $state('');
 
 	const isChoice = $derived(
 		category.slug === 'single-or-multiple' || category.slug === 'before-2000'
@@ -38,8 +38,8 @@
 	);
 
 	function handleTextSubmit() {
-		if (disabled || !textValue.trim()) return;
-		onsubmit(textValue.trim());
+		if (disabled || !value.trim()) return;
+		onsubmit(value.trim());
 	}
 
 	function handleChoice(value: string) {
@@ -100,11 +100,11 @@
 	<form onsubmit={handleTextSubmit} class="flex gap-2">
 		<input
 			type="text"
-			bind:value={textValue}
+			bind:value
 			{placeholder}
 			{disabled}
 			class="flex-1 rounded-lg border-slate-600 bg-slate-800 text-white placeholder-slate-500 focus:border-purple-500 focus:ring-purple-500"
 		/>
-		<Button color="purple" type="submit" disabled={disabled || !textValue.trim()}>Submit</Button>
+		<Button color="purple" type="submit" disabled={disabled || !value.trim()}>Submit</Button>
 	</form>
 {/if}

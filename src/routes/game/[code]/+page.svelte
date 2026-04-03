@@ -91,6 +91,7 @@
 	let gameOverData = $state<GameOverData | null>(null);
 	let gamePaused = $state(false);
 	let spinAnimating = $state(false);
+	let currentInputValue = $state('');
 
 	// Derived: the current player's result from reveal data
 	const myResult = $derived(
@@ -172,6 +173,7 @@
 		crossPlacementData = null;
 		crossPlaced = false;
 		readyCount = 0;
+		currentInputValue = '';
 
 		// Trigger spin animation
 		spinAnimating = true;
@@ -198,6 +200,9 @@
 			if (timerRemaining <= 0 && timerInterval) {
 				clearInterval(timerInterval);
 				timerInterval = null;
+				if (!answerSubmitted) {
+					handleSubmitAnswer(currentInputValue.trim());
+				}
 			}
 		}, 100);
 	}
@@ -390,7 +395,11 @@
 						<Timer remaining={timerRemaining} duration={timerDurationMs} />
 
 						{#if !answerSubmitted && currentCategory}
-							<AnswerInput category={currentCategory} onsubmit={handleSubmitAnswer} />
+							<AnswerInput
+								category={currentCategory}
+								onsubmit={handleSubmitAnswer}
+								bind:value={currentInputValue}
+							/>
 						{:else}
 							<p class="text-center text-sm text-green-400">Answer submitted!</p>
 						{/if}
