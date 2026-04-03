@@ -286,8 +286,7 @@ function startCrossPlacement(io, session, round) {
 					cells: eligibleCells
 				});
 			} else {
-				// Correct but no eligible cells — auto-ready
-				player.ready = true;
+				// Correct but no eligible cells
 				io.to(player.socketId).emit('cross-placement', {
 					correct: true,
 					cells: []
@@ -302,18 +301,6 @@ function startCrossPlacement(io, session, round) {
 		}
 	}
 
-	// Mark disconnected players as ready
-	for (const player of session.players) {
-		if (player.socketId === 'pending' || player.socketId === 'disconnected') {
-			const result = round.results[player.socketId];
-			if (result?.correct && player.scorecard) {
-				// Auto-place for disconnected correct players
-				autoPlaceCross(session, player, round);
-			}
-			player.ready = true;
-		}
-	}
-
 	// Emit ready count
 	const connected = connectedPlayers(session);
 	const readyCount = session.players.filter((p) => p.ready).length;
@@ -324,26 +311,6 @@ function startCrossPlacement(io, session, round) {
 	});
 
 	checkAllReady(io, session);
-}
-
-/**
- * Auto-place a cross for a player (first eligible cell).
- * @param {GameSession} session
- * @param {Player} player
- * @param {RoundState} round
- */
-function autoPlaceCross(session, player, round) {
-	if (!player.scorecard || !round.selectedCategory) return;
-
-	for (let i = 0; i < player.scorecard.length; i++) {
-		const cell = player.scorecard[i];
-		if (cell.category === round.selectedCategory && !cell.marked) {
-			cell.marked = true;
-			const result = round.results[player.socketId];
-			player.score += result?.exactYear ? 2 : 1;
-			break;
-		}
-	}
 }
 
 /**

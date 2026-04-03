@@ -223,11 +223,6 @@
 	function handleCrossPlacement(payload: CrossPlacementData) {
 		roundPhase = 'cross-placement';
 		crossPlacementData = payload;
-
-		// If not correct or no eligible cells, auto-ready
-		if (!payload.correct || payload.cells.length === 0) {
-			playerReady(data.game.code);
-		}
 	}
 
 	function handlePlayerReadied(payload: PlayerReadiedData) {
@@ -269,8 +264,6 @@
 				if (scorecard && res.marked !== undefined) {
 					scorecard[res.marked].marked = true;
 				}
-				// Ready up after placing
-				playerReady(data.game.code);
 			}
 		});
 	}
@@ -466,12 +459,7 @@
 								/>
 							{/if}
 						</div>
-					{:else if crossPlacementData?.correct && crossPlaced}
-						<div class="space-y-4 text-center">
-							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} disabled />
-						</div>
 					{:else}
-						<!-- Wrong answer — ready up -->
 						<div class="space-y-4 text-center">
 							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} />
 						</div>
