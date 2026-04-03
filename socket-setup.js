@@ -128,6 +128,11 @@ function startRound(io, session) {
 	if (!track) {
 		// No tracks left — game over
 		session.status = 'finished';
+		if (session.pauseTrack && session.hostDeviceId) {
+			session.pauseTrack(session.hostDeviceId).catch((err) => {
+				console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+			});
+		}
 		io.to(session.code).emit('game-over', {
 			reason: 'no-tracks',
 			scoreboard: buildScoreboard(session)
@@ -202,13 +207,6 @@ function endRound(io, session, round) {
 	if (session.currentRound !== round || round.phase !== 'playing') return;
 
 	round.phase = 'reveal';
-
-	// Pause playback
-	if (session.pauseTrack && session.hostDeviceId) {
-		session.pauseTrack(session.hostDeviceId).catch((err) => {
-			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
-		});
-	}
 
 	const track = /** @type {import('./src/lib/server/game/types.js').Track} */ (round.selectedTrack);
 	const category = /** @type {import('./src/lib/server/game/types.js').CategorySlug} */ (
@@ -649,6 +647,11 @@ export function setupSocketIO(httpServer, gamesMap) {
 								const pauseTimer = setTimeout(() => {
 									if (session.status !== 'playing') return;
 									session.status = 'finished';
+									if (session.pauseTrack && session.hostDeviceId) {
+										session.pauseTrack(session.hostDeviceId).catch((err) => {
+											console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+										});
+									}
 									clearGameTimers(session.code);
 									io.to(session.code).emit('game-over', {
 										reason: 'host-left',
