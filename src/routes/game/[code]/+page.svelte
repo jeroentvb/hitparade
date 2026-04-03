@@ -434,9 +434,21 @@
 					{/if}
 				{:else if roundPhase === 'cross-placement'}
 					<!-- Cross placement phase -->
+					{#if revealData}
+						<SongCard track={revealData.track} revealed={true} />
+					{/if}
+
+					{#if myResult}
+						<ResultBanner
+							correct={myResult.correct}
+							answer={myResult.answer}
+							correctAnswer={myResult.correctAnswer}
+						/>
+					{/if}
+
 					{#if crossPlacementData?.correct && crossPlacementData.cells.length > 0 && !crossPlaced}
 						<div class="space-y-4 text-center">
-							<p class="text-lg font-medium text-green-400">Correct! Place your cross:</p>
+							<p class="text-lg font-medium text-green-400">Place your cross:</p>
 							{#if scorecard}
 								<Scorecard
 									cells={scorecard}
@@ -447,13 +459,11 @@
 						</div>
 					{:else if crossPlacementData?.correct && crossPlaced}
 						<div class="space-y-4 text-center">
-							<p class="text-green-400">Cross placed! Waiting for others...</p>
 							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} disabled />
 						</div>
 					{:else}
 						<!-- Wrong answer — ready up -->
 						<div class="space-y-4 text-center">
-							<p class="text-red-400">Wrong answer this round</p>
 							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} />
 						</div>
 					{/if}
