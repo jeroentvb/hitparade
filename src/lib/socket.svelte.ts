@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
+import type { CategorySlug } from '$lib/categories';
 
 let socket: Socket | null = $state(null);
 let connected: boolean = $state(false);
@@ -211,12 +212,12 @@ export interface LobbyUpdate {
 }
 
 export interface ScorecardCell {
-	category: string;
+	category: CategorySlug;
 	marked: boolean;
 }
 
 export interface CategoryInfo {
-	slug: string;
+	slug: CategorySlug;
 	name: string;
 }
 

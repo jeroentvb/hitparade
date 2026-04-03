@@ -1,47 +1,56 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import { Button, Spinner, Alert } from 'flowbite-svelte';
+	import { onDestroy, onMount } from 'svelte';
+	import { Alert, Button, Spinner } from 'flowbite-svelte';
+	import DiscoSpinner from '$lib/components/DiscoSpinner.svelte';
+	import SongCard from '$lib/components/SongCard.svelte';
+	import Timer from '$lib/components/Timer.svelte';
+	import AnswerInput from '$lib/components/AnswerInput.svelte';
+	import Scorecard from '$lib/components/Scorecard.svelte';
+	import ResultBanner from '$lib/components/ResultBanner.svelte';
+	import ReadyButton from '$lib/components/ReadyButton.svelte';
+	import WinScreen from '$lib/components/WinScreen.svelte';
+	import { categoriesForDifficulty } from '$lib/categories.js';
 	import {
+		type CategoryInfo,
 		connect,
+		type CrossPlacementData,
 		disconnect,
+		type GameOverData,
+		type GameWonData,
 		getSocket,
 		isConnected,
-		registerPlayer,
-		startGame,
-		setDeviceId,
-		submitAnswer,
-		placeCross,
-		playerReady,
-		onLobbyUpdate,
-		offLobbyUpdate,
-		onGameStarted,
+		type LobbyUpdate,
+		offAnswerSubmitted,
+		offCrossPlacement,
+		offGameOver,
+		offGamePaused,
 		offGameStarted,
-		onRoundSpin,
+		offGameWon,
+		offLobbyUpdate,
+		offPlayerReadied,
+		offRoundReveal,
 		offRoundSpin,
-		onTimerStarted,
 		offTimerStarted,
 		onAnswerSubmitted,
-		offAnswerSubmitted,
-		onRoundReveal,
-		offRoundReveal,
 		onCrossPlacement,
-		offCrossPlacement,
-		onPlayerReadied,
-		offPlayerReadied,
-		onGameWon,
-		offGameWon,
 		onGameOver,
-		offGameOver,
 		onGamePaused,
-		offGamePaused,
-		type LobbyUpdate,
-		type ScorecardCell,
-		type CategoryInfo,
-		type RoundRevealData,
-		type CrossPlacementData,
+		onGameStarted,
+		onGameWon,
+		onLobbyUpdate,
+		onPlayerReadied,
+		onRoundReveal,
+		onRoundSpin,
+		onTimerStarted,
+		placeCross,
 		type PlayerReadiedData,
-		type GameWonData,
-		type GameOverData
+		playerReady,
+		registerPlayer,
+		type RoundRevealData,
+		type ScorecardCell,
+		setDeviceId,
+		startGame,
+		submitAnswer
 	} from '$lib/socket.svelte';
 
 	let { data } = $props();
@@ -71,7 +80,6 @@
 	let timerDurationMs = $state(0);
 	let timerRemaining = $state(0);
 	let timerInterval = $state<ReturnType<typeof setInterval> | null>(null);
-	let answerInput = $state('');
 	let answerSubmitted = $state(false);
 	let submittedCount = $state(0);
 	let revealData = $state<RoundRevealData | null>(null);
@@ -82,6 +90,15 @@
 	let gameWinner = $state<GameWonData | null>(null);
 	let gameOverData = $state<GameOverData | null>(null);
 	let gamePaused = $state(false);
+	let spinAnimating = $state(false);
+
+	// Derived: the current player's result from reveal data
+	const myResult = $derived(
+		revealData?.results.find((r) => r.nickname === data.player.nickname) ?? null
+	);
+
+	// Categories for the spinner (from game config difficulty)
+	const difficultyCategories = $derived(categoriesForDifficulty(lobby.config.difficulty));
 
 	// --- Lobby handlers ---
 
@@ -149,13 +166,18 @@
 		roundPhase = 'spin';
 		roundNumber = payload.roundNumber;
 		currentCategory = payload.category;
-		answerInput = '';
 		answerSubmitted = false;
 		submittedCount = 0;
 		revealData = null;
 		crossPlacementData = null;
 		crossPlaced = false;
 		readyCount = 0;
+
+		// Trigger spin animation
+		spinAnimating = true;
+		setTimeout(() => {
+			spinAnimating = false;
+		}, 3000);
 	}
 
 	function handleTimerStarted(payload: {
@@ -224,10 +246,10 @@
 
 	// --- User actions ---
 
-	function handleSubmitAnswer() {
-		if (answerSubmitted || !answerInput.trim()) return;
+	function handleSubmitAnswer(answer: string) {
+		if (answerSubmitted) return;
 		answerSubmitted = true;
-		submitAnswer(data.game.code, answerInput.trim());
+		submitAnswer(data.game.code, answer);
 	}
 
 	function handlePlaceCross(cellIndex: number) {
@@ -310,34 +332,19 @@
 <main class="flex flex-1 flex-col items-center px-4 py-8">
 	<div class="w-full max-w-lg space-y-6">
 		{#if gameWinner}
-			<!-- Win screen -->
-			<div class="text-center">
-				<h1
-					class="mb-2 bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-400 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent"
-				>
-					Bingo!
-				</h1>
-				<p class="text-xl text-white">{gameWinner.nickname} wins!</p>
-				<div class="mt-4 rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-					<h3 class="mb-2 text-sm font-medium text-slate-400">Final Scores</h3>
-					{#each gameWinner.scoreboard as entry (entry.nickname)}
-						<div class="flex justify-between py-1 text-sm text-white">
-							<span>{entry.nickname}</span>
-							<span class="font-mono">{entry.score}</span>
-						</div>
-					{/each}
-				</div>
-			</div>
+			<WinScreen winner={gameWinner} />
 		{:else if gameOverData}
 			<!-- Game over screen -->
-			<div class="text-center">
-				<h1 class="mb-2 text-3xl font-bold text-white">Game Over</h1>
-				<p class="text-slate-400">
-					{gameOverData.reason === 'no-tracks'
-						? 'No more tracks left in the playlist!'
-						: 'The game has ended.'}
-				</p>
-				<div class="mt-4 rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+			<div class="space-y-6 text-center">
+				<div>
+					<h1 class="mb-2 text-3xl font-bold text-white">Game Over</h1>
+					<p class="text-slate-400">
+						{gameOverData.reason === 'no-tracks'
+							? 'No more tracks left in the playlist!'
+							: 'The game has ended.'}
+					</p>
+				</div>
+				<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
 					<h3 class="mb-2 text-sm font-medium text-slate-400">Final Scores</h3>
 					{#each gameOverData.scoreboard as entry (entry.nickname)}
 						<div class="flex justify-between py-1 text-sm text-white">
@@ -348,7 +355,6 @@
 				</div>
 			</div>
 		{:else if gamePaused}
-			<!-- Game paused -->
 			<div class="text-center">
 				<h1 class="mb-2 text-3xl font-bold text-yellow-300">Game Paused</h1>
 				<p class="text-slate-400">Waiting for the host to reconnect...</p>
@@ -356,11 +362,11 @@
 			</div>
 		{:else if gameStarted}
 			<!-- Game playing state -->
-			<div class="space-y-4">
-				<!-- Round info -->
+			<div class="space-y-5">
+				<!-- Round info header -->
 				<div class="text-center">
 					<p class="text-sm text-slate-400">Round {roundNumber}</p>
-					{#if currentCategory}
+					{#if currentCategory && roundPhase !== 'spin'}
 						<h2 class="text-2xl font-bold text-white">{currentCategory.name}</h2>
 					{/if}
 				</div>
@@ -373,41 +379,18 @@
 
 				{#if roundPhase === 'spin'}
 					<!-- Spin phase -->
-					<div class="text-center">
-						<div class="mb-4 text-6xl">🎵</div>
-						<p class="text-lg text-slate-300">Spinning...</p>
-					</div>
+					<DiscoSpinner
+						categories={difficultyCategories}
+						selectedCategory={currentCategory}
+						spinning={spinAnimating}
+					/>
 				{:else if roundPhase === 'playing'}
 					<!-- Playing phase: timer + answer input -->
-					<div class="space-y-4">
-						<!-- Timer -->
-						<div class="text-center">
-							<div class="font-mono text-4xl font-bold text-white">
-								{Math.ceil(timerRemaining / 1000)}s
-							</div>
-							<div class="mt-2 h-2 w-full rounded-full bg-slate-700">
-								<div
-									class="h-2 rounded-full transition-all duration-100 {timerRemaining > 10000
-										? 'bg-purple-500'
-										: timerRemaining > 5000
-											? 'bg-orange-500'
-											: 'bg-red-500'}"
-									style="width: {(timerRemaining / timerDurationMs) * 100}%"
-								></div>
-							</div>
-						</div>
+					<div class="space-y-5">
+						<Timer remaining={timerRemaining} duration={timerDurationMs} />
 
-						<!-- Answer input -->
-						{#if !answerSubmitted}
-							<form onsubmit={handleSubmitAnswer} class="flex gap-2">
-								<input
-									type="text"
-									bind:value={answerInput}
-									placeholder="Your answer..."
-									class="flex-1 rounded-lg border-slate-600 bg-slate-800 text-white placeholder-slate-500 focus:border-purple-500 focus:ring-purple-500"
-								/>
-								<Button color="purple" type="submit" disabled={!answerInput.trim()}>Submit</Button>
-							</form>
+						{#if !answerSubmitted && currentCategory}
+							<AnswerInput category={currentCategory} onsubmit={handleSubmitAnswer} />
 						{:else}
 							<p class="text-center text-sm text-green-400">Answer submitted!</p>
 						{/if}
@@ -420,24 +403,24 @@
 					<!-- Reveal phase -->
 					{#if revealData}
 						<div class="space-y-4">
-							<!-- Track info -->
-							<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-center">
-								<p class="text-lg font-bold text-white">{revealData.track.name}</p>
-								<p class="text-sm text-slate-400">
-									{revealData.track.artists.join(', ')}
-								</p>
-								<p class="text-sm text-slate-500">
-									{revealData.track.albumName} &middot; {revealData.track.releaseYear}
-								</p>
-							</div>
+							<SongCard track={revealData.track} revealed={true} />
 
-							<!-- Player results -->
-							<div class="space-y-2">
+							<!-- My result banner -->
+							{#if myResult}
+								<ResultBanner
+									correct={myResult.correct}
+									answer={myResult.answer}
+									correctAnswer={myResult.correctAnswer}
+								/>
+							{/if}
+
+							<!-- All player results -->
+							<div class="space-y-1.5">
 								{#each revealData.results as result (result.nickname)}
 									<div
 										class="flex items-center justify-between rounded-lg px-3 py-2 {result.correct
-											? 'border border-green-700 bg-green-900/30'
-											: 'border border-red-700 bg-red-900/30'}"
+											? 'border border-green-700/50 bg-green-900/20'
+											: 'border border-red-700/50 bg-red-900/20'}"
 									>
 										<span class="text-sm text-white">{result.nickname}</span>
 										<span class="text-sm {result.correct ? 'text-green-400' : 'text-red-400'}">
@@ -452,43 +435,26 @@
 				{:else if roundPhase === 'cross-placement'}
 					<!-- Cross placement phase -->
 					{#if crossPlacementData?.correct && crossPlacementData.cells.length > 0 && !crossPlaced}
-						<div class="text-center">
-							<p class="mb-4 text-lg text-green-400">Correct! Place your cross:</p>
-							<!-- Scorecard grid for cross placement -->
+						<div class="space-y-4 text-center">
+							<p class="text-lg font-medium text-green-400">Correct! Place your cross:</p>
 							{#if scorecard}
-								<div class="mx-auto grid w-fit grid-cols-5 gap-1">
-									{#each scorecard as cell, i (i)}
-										<button
-											class="h-12 w-12 rounded text-xs font-medium transition-colors
-												{cell.marked
-												? 'cursor-not-allowed bg-purple-700 text-purple-200'
-												: crossPlacementData.cells.includes(i)
-													? 'cursor-pointer bg-green-600 text-white hover:bg-green-500'
-													: 'cursor-not-allowed bg-slate-700 text-slate-400'}"
-											disabled={cell.marked || !crossPlacementData.cells.includes(i)}
-											onclick={() => handlePlaceCross(i)}
-										>
-											{cell.marked ? '✕' : ''}
-										</button>
-									{/each}
-								</div>
+								<Scorecard
+									cells={scorecard}
+									eligibleCells={crossPlacementData.cells}
+									onplace={handlePlaceCross}
+								/>
 							{/if}
 						</div>
 					{:else if crossPlacementData?.correct && crossPlaced}
-						<div class="text-center">
+						<div class="space-y-4 text-center">
 							<p class="text-green-400">Cross placed! Waiting for others...</p>
-							<p class="mt-2 text-sm text-slate-400">
-								{readyCount}/{totalPlayers} ready
-							</p>
+							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} disabled />
 						</div>
 					{:else}
 						<!-- Wrong answer — ready up -->
-						<div class="text-center">
-							<p class="mb-4 text-red-400">Wrong answer this round</p>
-							<Button color="purple" onclick={handleReady}>Ready for next round</Button>
-							<p class="mt-2 text-sm text-slate-400">
-								{readyCount}/{totalPlayers} ready
-							</p>
+						<div class="space-y-4 text-center">
+							<p class="text-red-400">Wrong answer this round</p>
+							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} />
 						</div>
 					{/if}
 				{:else}
@@ -499,26 +465,16 @@
 					</div>
 				{/if}
 
-				<!-- Scorecard (always visible during game) -->
+				<!-- Scorecard (always visible during game, except during cross-placement where it's inline) -->
 				{#if scorecard && roundPhase !== 'cross-placement'}
-					<div class="mt-6">
+					<div class="mt-4">
 						<h3 class="mb-2 text-center text-sm font-medium text-slate-400">Your Scorecard</h3>
-						<div class="mx-auto grid w-fit grid-cols-5 gap-1">
-							{#each scorecard as cell, i (i)}
-								<div
-									class="flex h-12 w-12 items-center justify-center rounded text-xs font-medium
-										{cell.marked ? 'bg-purple-700 text-purple-200' : 'bg-slate-700 text-slate-400'}"
-								>
-									{cell.marked ? '✕' : ''}
-								</div>
-							{/each}
-						</div>
+						<Scorecard cells={scorecard} />
 					</div>
 				{/if}
 			</div>
 		{:else}
 			<!-- Lobby screen -->
-			<!-- Join Code -->
 			<div class="text-center">
 				<p class="mb-1 text-sm tracking-widest text-slate-400 uppercase">Join Code</p>
 				<h1 class="font-mono text-5xl font-extrabold tracking-wider text-white">
@@ -535,7 +491,6 @@
 				</Alert>
 			{/if}
 
-			<!-- Game Config Summary -->
 			<section class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
 				<div class="flex items-center justify-between text-sm">
 					<div class="text-slate-400">
@@ -583,7 +538,6 @@
 				</section>
 			{/if}
 
-			<!-- Player List -->
 			<section class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold text-white">Players</h2>
@@ -623,7 +577,6 @@
 				</div>
 			</section>
 
-			<!-- Action Area -->
 			<div class="text-center">
 				{#if isHost}
 					<Button
