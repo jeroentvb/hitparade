@@ -85,6 +85,7 @@
 	let revealData = $state<RoundRevealData | null>(null);
 	let crossPlacementData = $state<CrossPlacementData | null>(null);
 	let crossPlaced = $state(false);
+	let localReady = $state(false);
 	let readyCount = $state(0);
 	let totalPlayers = $state(0);
 	let gameWinner = $state<GameWonData | null>(null);
@@ -174,6 +175,7 @@
 		revealData = null;
 		crossPlacementData = null;
 		crossPlaced = false;
+		localReady = false;
 		readyCount = 0;
 		currentInputValue = '';
 
@@ -276,6 +278,7 @@
 	}
 
 	function handleReady() {
+		localReady = true;
 		playerReady(data.game.code);
 	}
 
@@ -469,7 +472,14 @@
 						</div>
 					{:else}
 						<div class="space-y-4 text-center">
-							<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} />
+							{#if localReady}
+								<p class="text-lg text-slate-400">Waiting for next round..</p>
+								<p class="text-sm text-slate-400">
+									{readyCount}/{totalPlayers} ready
+								</p>
+							{:else}
+								<ReadyButton {readyCount} totalCount={totalPlayers} onready={handleReady} />
+							{/if}
 						</div>
 					{/if}
 				{:else}
