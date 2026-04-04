@@ -282,6 +282,7 @@
 				if (scorecard && res.marked !== undefined) {
 					scorecard[res.marked].marked = true;
 				}
+				localReady = true;
 			}
 		});
 	}
