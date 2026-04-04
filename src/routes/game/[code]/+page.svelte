@@ -474,7 +474,7 @@
 				{/if}
 
 				<!-- Scorecard (always visible during game, except during cross-placement where it's inline) -->
-				{#if scorecard && roundPhase !== 'cross-placement'}
+				{#if scorecard && !(roundPhase === 'cross-placement' && crossPlacementData?.correct && crossPlacementData.cells.length > 0 && !crossPlaced)}
 					<div class="mt-4">
 						<h3 class="mb-2 text-center text-sm font-medium text-slate-400">Your Scorecard</h3>
 						<Scorecard cells={scorecard} categories={difficultyCategories} />

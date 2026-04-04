@@ -26,7 +26,7 @@
 		{@const isWinning = winningLine?.includes(i) ?? false}
 		{#if isInteractive && isEligible && !cell.marked}
 			<button
-				class="relative flex h-14 w-14 items-center justify-center rounded-lg border-2 text-xs font-bold transition-all {color.border} {color.bg} ring-2 {color.glow} animate-pulse opacity-90 hover:opacity-100"
+				class="relative flex h-14 w-14 items-center justify-center rounded-lg border-2 text-xs font-bold transition-all {color.border} {color.bg} ring-2 {color.glow} animate-pulse cursor-pointer opacity-90 hover:opacity-100"
 				aria-label="Place cross on {categoryName(cell.category)}"
 				onclick={() => onplace?.(i)}
 			>
