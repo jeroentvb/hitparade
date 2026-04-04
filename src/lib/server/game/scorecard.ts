@@ -1,12 +1,12 @@
 import type { Difficulty, Scorecard } from './types.js';
-import { categoriesForDifficulty, type CategorySlug } from '$lib/categories.js';
+import { categoriesForDifficulty, type CategorySlug } from '../../categories.js';
 
 export {
 	SIDE_A_CATEGORIES,
 	SIDE_B_CATEGORIES,
 	categoryName,
 	type CategorySlug
-} from '$lib/categories.js';
+} from '../../categories.js';
 
 /**
  * Randomly distribute 25 cells across `count` categories, each appearing 3-5 times.

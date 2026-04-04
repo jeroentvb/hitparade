@@ -191,6 +191,14 @@ export function offGamePaused(handler: (data: GamePausedData) => void): void {
 	getSocket().off('game-paused', handler);
 }
 
+export function onScoresUpdate(handler: (data: ScoreboardEntry[]) => void): void {
+	getSocket().on('scores-update', handler);
+}
+
+export function offScoresUpdate(handler: (data: ScoreboardEntry[]) => void): void {
+	getSocket().off('scores-update', handler);
+}
+
 // --- Types ---
 
 interface LobbyPlayer {

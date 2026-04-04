@@ -30,6 +30,7 @@
 		offPlayerReadied,
 		offRoundReveal,
 		offRoundSpin,
+		offScoresUpdate,
 		offTimerStarted,
 		onAnswerSubmitted,
 		onCrossPlacement,
@@ -41,12 +42,14 @@
 		onPlayerReadied,
 		onRoundReveal,
 		onRoundSpin,
+		onScoresUpdate,
 		onTimerStarted,
 		placeCross,
 		type PlayerReadiedData,
 		playerReady,
 		registerPlayer,
 		type RoundRevealData,
+		type ScoreboardEntry,
 		type ScorecardCell,
 		setDeviceId,
 		startGame,
@@ -92,6 +95,7 @@
 	let gameWinner = $state<GameWonData | null>(null);
 	let gameOverData = $state<GameOverData | null>(null);
 	let gamePaused = $state(false);
+	let scores = $state<ScoreboardEntry[]>([]);
 	let spinAnimating = $state(false);
 	let currentInputValue = $state('');
 
@@ -254,6 +258,10 @@
 		gamePaused = true;
 	}
 
+	function handleScoresUpdate(data: ScoreboardEntry[]) {
+		scores = [...data].sort((a, b) => b.score - a.score);
+	}
+
 	// --- User actions ---
 
 	function handleSubmitAnswer(answer: string) {
@@ -305,6 +313,7 @@
 		onGameWon(handleGameWon);
 		onGameOver(handleGameOver);
 		onGamePaused(handleGamePaused);
+		onScoresUpdate(handleScoresUpdate);
 
 		// Load devices for host
 		if (data.player.isHost) {
@@ -326,6 +335,7 @@
 		offGameWon(handleGameWon);
 		offGameOver(handleGameOver);
 		offGamePaused(handleGamePaused);
+		offScoresUpdate(handleScoresUpdate);
 		disconnect();
 
 		if (timerInterval) {
@@ -379,6 +389,23 @@
 						<h2 class="text-2xl font-bold text-white">{currentCategory.name}</h2>
 					{/if}
 				</div>
+
+				<!-- Score pills -->
+				{#if scores.length > 0}
+					<div class="flex flex-wrap justify-center gap-2">
+						{#each scores as entry (entry.nickname)}
+							<span
+								class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium {entry.nickname ===
+								data.player.nickname
+									? 'bg-purple-600/30 text-purple-300 ring-1 ring-purple-500/50'
+									: 'bg-slate-700/50 text-slate-300'}"
+							>
+								<span class="max-w-[6rem] truncate">{entry.nickname}</span>
+								<span class="font-mono font-bold">{entry.score}</span>
+							</span>
+						{/each}
+					</div>
+				{/if}
 
 				{#if error}
 					<Alert color="red" dismissable onclick={() => (error = '')}>

@@ -443,6 +443,7 @@ export function setupSocketIO(httpServer, gamesMap) {
 					scorecard: player.scorecard
 				});
 			}
+			io.to(session.code).emit('scores-update', buildScoreboard(session));
 			console.log(`[socket.io] game ${code} started`);
 			if (typeof callback === 'function') callback({ ok: true });
 
@@ -578,6 +579,9 @@ export function setupSocketIO(httpServer, gamesMap) {
 				}
 
 				if (typeof callback === 'function') callback({ ok: true, marked: cellIndex });
+
+				// Emit updated scores
+				io.to(session.code).emit('scores-update', buildScoreboard(session));
 
 				// Emit updated ready count
 				const connected = connectedPlayers(session);
