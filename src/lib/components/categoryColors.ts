@@ -71,19 +71,3 @@ const FALLBACK = {
 export function categoryColor(slug: CategorySlug) {
 	return CATEGORY_COLORS[slug] ?? FALLBACK;
 }
-
-/** Short label for scorecard cells. */
-export function categoryShortLabel(slug: CategorySlug): string {
-	const labels: Record<CategorySlug, string> = {
-		'single-or-multiple': 'S/M',
-		'before-2000': '<2k',
-		'4-year-margin': '±4y',
-		decade: 'Dec',
-		'2-year-margin': '±2y',
-		'song-title': 'Song',
-		'exact-year': 'Year',
-		'artist-name': 'Art',
-		'3-year-margin': '±3y'
-	};
-	return labels[slug] ?? '?';
-}

@@ -454,6 +454,7 @@
 							{#if scorecard}
 								<Scorecard
 									cells={scorecard}
+									categories={difficultyCategories}
 									eligibleCells={crossPlacementData.cells}
 									onplace={handlePlaceCross}
 								/>
@@ -476,7 +477,7 @@
 				{#if scorecard && roundPhase !== 'cross-placement'}
 					<div class="mt-4">
 						<h3 class="mb-2 text-center text-sm font-medium text-slate-400">Your Scorecard</h3>
-						<Scorecard cells={scorecard} />
+						<Scorecard cells={scorecard} categories={difficultyCategories} />
 					</div>
 				{/if}
 			</div>
