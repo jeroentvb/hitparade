@@ -163,7 +163,7 @@ function startRound(io, session) {
 		category
 	});
 
-	// After 3s spin animation, start playback
+	// After 3s spin + 5s hold, start playback
 	const playTimer = setTimeout(async () => {
 		if (session.status !== 'playing' || session.currentRound !== round) return;
 
@@ -193,7 +193,7 @@ function startRound(io, session) {
 		// Schedule reveal after timer expires
 		const revealTimer = setTimeout(() => endRound(io, session, round), durationMs);
 		addTimer(session.code, revealTimer);
-	}, 3000);
+	}, 8000);
 	addTimer(session.code, playTimer);
 }
 

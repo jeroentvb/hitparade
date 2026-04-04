@@ -163,6 +163,8 @@
 
 	// --- Round handlers ---
 
+	let spinHoldTimeout: ReturnType<typeof setTimeout> | null = null;
+
 	function handleRoundSpin(payload: { roundNumber: number; category: CategoryInfo }) {
 		roundPhase = 'spin';
 		roundNumber = payload.roundNumber;
@@ -175,11 +177,16 @@
 		readyCount = 0;
 		currentInputValue = '';
 
-		// Trigger spin animation
+		// Trigger spin animation (3s spin + 5s hold)
 		spinAnimating = true;
+		if (spinHoldTimeout) clearTimeout(spinHoldTimeout);
 		setTimeout(() => {
 			spinAnimating = false;
 		}, 3000);
+		spinHoldTimeout = setTimeout(() => {
+			spinHoldTimeout = null;
+			if (roundPhase === 'spin') roundPhase = 'playing';
+		}, 8000);
 	}
 
 	function handleTimerStarted(payload: {
@@ -187,7 +194,7 @@
 		durationMs: number;
 		category: CategoryInfo;
 	}) {
-		roundPhase = 'playing';
+		if (!spinHoldTimeout) roundPhase = 'playing';
 		timerStartedAt = payload.startedAt;
 		timerDurationMs = payload.durationMs;
 		currentCategory = payload.category;
