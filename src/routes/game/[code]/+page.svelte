@@ -64,12 +64,13 @@
 
 	const isHost = $derived(lobby.hostNickname.toLowerCase() === data.player.nickname.toLowerCase());
 	const connectedCount = $derived(lobby.players.filter((p) => p.connected).length);
-	const canStart = $derived(isHost && connectedCount >= 2 && !starting);
 
 	// --- Device selection (host only) ---
 	let devices = $state<Array<{ id: string; name: string }>>([]);
 	let selectedDeviceId = $state('');
 	let loadingDevices = $state(false);
+
+	const canStart = $derived(isHost && connectedCount >= 2 && selectedDeviceId !== '' && !starting);
 
 	// --- Game round state ---
 	let scorecard = $state<ScorecardCell[] | null>(null);
@@ -620,6 +621,10 @@
 					</Button>
 					{#if connectedCount < 2}
 						<p class="mt-2 text-sm text-slate-400">Waiting for at least 2 players to connect...</p>
+					{:else if selectedDeviceId === ''}
+						<p class="mt-2 text-sm text-slate-400">
+							Select a Spotify device above to start the game.
+						</p>
 					{/if}
 				{:else}
 					<div class="flex items-center justify-center gap-2 text-slate-400">

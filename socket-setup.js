@@ -427,6 +427,12 @@ export function setupSocketIO(httpServer, gamesMap) {
 				return;
 			}
 
+			if (!session.hostDeviceId) {
+				if (typeof callback === 'function')
+					callback({ ok: false, error: 'No playback device selected' });
+				return;
+			}
+
 			session.status = 'playing';
 			for (const player of session.players) {
 				player.scorecard = generateScorecard(session.config.difficulty);
