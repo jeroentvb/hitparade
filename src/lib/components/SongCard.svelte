@@ -8,23 +8,24 @@
 	} = $props();
 </script>
 
-<div class="mx-auto w-full max-w-sm perspective-[600px]">
+<div class="mx-auto w-full max-w-sm" style="perspective: 600px">
 	<div
-		class="relative h-40 transition-transform duration-700 [transform-style:preserve-3d] {revealed
-			? '[transform:rotateY(180deg)]'
-			: ''}"
+		class="relative h-40 transition-transform duration-700"
+		style="transform-style: preserve-3d; {revealed ? 'transform: rotateY(180deg)' : ''}"
 	>
 		<!-- Front -->
-		<div
-			class="absolute inset-0 flex flex-col items-center justify-center rounded-xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 [backface-visibility:hidden]"
-		>
-			<span class="mb-2 text-4xl">🎵</span>
-			<p class="text-lg font-medium text-slate-300">Now playing...</p>
-		</div>
+		<!--		<div-->
+		<!--			class="absolute inset-0 flex flex-col items-center justify-center rounded-xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900"-->
+		<!--			style="backface-visibility: hidden"-->
+		<!--		>-->
+		<!--			<span class="mb-2 text-4xl">🎵</span>-->
+		<!--			<p class="text-lg font-medium text-slate-300">Now playing...</p>-->
+		<!--		</div>-->
 
 		<!-- Back -->
 		<div
-			class="absolute inset-0 flex [transform:rotateY(180deg)] flex-col items-center justify-center rounded-xl border border-purple-600/50 bg-gradient-to-br from-purple-900/60 to-slate-900 [backface-visibility:hidden]"
+			class="absolute inset-0 flex flex-col items-center justify-center rounded-xl border border-purple-600/50 bg-gradient-to-br from-purple-900/60 to-slate-900"
+			style="backface-visibility: hidden; transform: rotateY(180deg)"
 		>
 			{#if track}
 				<p class="px-4 text-center text-lg font-bold text-white">{track.name}</p>
