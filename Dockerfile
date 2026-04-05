@@ -12,6 +12,8 @@ RUN bun install --frozen-lockfile
 FROM deps AS build
 COPY . .
 RUN bun run build
+# Compile shared server modules imported by socket-setup.js
+RUN npx tsc --outDir compiled-server --module nodenext --moduleResolution nodenext --target es2022 --skipLibCheck --declaration false src/lib/server/game/scorecard.ts src/lib/server/game/answer-checker.ts src/lib/server/game/bingo.ts src/lib/server/game/types.ts src/lib/categories.ts
 
 # Production dependencies only
 FROM base AS prod-deps
@@ -28,6 +30,7 @@ COPY --from=build /app/package.json ./
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/server.js ./
 COPY --from=build /app/socket-setup.js ./
+COPY --from=build /app/compiled-server ./src/lib
 EXPOSE 3000
 CMD ["node", "server.js"]
 

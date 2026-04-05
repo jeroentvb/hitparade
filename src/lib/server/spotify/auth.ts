@@ -1,9 +1,5 @@
 import { SpotifyApi, type IAuthStrategy, type AccessToken } from '@spotify/web-api-ts-sdk';
-import {
-	SPOTIFY_CLIENT_ID,
-	SPOTIFY_CLIENT_SECRET,
-	SPOTIFY_REDIRECT_URI
-} from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import type { SpotifySession } from './types.js';
 
 const sessions = new Map<string, SpotifySession>();
@@ -54,7 +50,7 @@ async function refreshWithSecret(token: AccessToken): Promise<AccessToken> {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
-			Authorization: `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`
+			Authorization: `Basic ${btoa(`${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`)}`
 		},
 		body: new URLSearchParams({
 			grant_type: 'refresh_token',
@@ -80,9 +76,9 @@ async function refreshWithSecret(token: AccessToken): Promise<AccessToken> {
 export function generateAuthUrl(state: string): string {
 	const params = new URLSearchParams({
 		response_type: 'code',
-		client_id: SPOTIFY_CLIENT_ID,
+		client_id: env.SPOTIFY_CLIENT_ID!,
 		scope: SCOPES.join(' '),
-		redirect_uri: SPOTIFY_REDIRECT_URI,
+		redirect_uri: env.SPOTIFY_REDIRECT_URI!,
 		state
 	});
 	return `${AUTHORIZE_ENDPOINT}?${params}`;
@@ -93,12 +89,12 @@ export async function exchangeCode(code: string): Promise<AccessToken> {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
-			Authorization: `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`
+			Authorization: `Basic ${btoa(`${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`)}`
 		},
 		body: new URLSearchParams({
 			grant_type: 'authorization_code',
 			code,
-			redirect_uri: SPOTIFY_REDIRECT_URI
+			redirect_uri: env.SPOTIFY_REDIRECT_URI!
 		})
 	});
 

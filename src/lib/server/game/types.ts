@@ -38,14 +38,14 @@ export interface Track {
 	multipleArtists: boolean;
 }
 
-import type { CategorySlug } from '$lib/categories.js';
+import type { CategorySlug } from '../../categories.js';
 
 export interface ScorecardCell {
 	category: CategorySlug;
 	marked: boolean;
 }
 
-export type { CategorySlug } from '$lib/categories.js';
+export type { CategorySlug } from '../../categories.js';
 
 export type Scorecard = ScorecardCell[];
 
