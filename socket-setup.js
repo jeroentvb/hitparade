@@ -480,10 +480,10 @@ export function setupSocketIO(httpServer, gamesMap) {
 					return;
 				}
 
-				// Check timer hasn't expired
+				// Check timer hasn't expired (5s grace period for slow connections)
 				if (round.timer) {
 					const elapsed = Date.now() - round.timer.startedAt;
-					if (elapsed > round.timer.durationMs) {
+					if (elapsed > round.timer.durationMs + 5000) {
 						if (typeof callback === 'function') callback({ ok: false, error: 'Time is up' });
 						return;
 					}

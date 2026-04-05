@@ -204,7 +204,7 @@
 		category: CategoryInfo;
 	}) {
 		if (!spinHoldTimeout) roundPhase = 'playing';
-		timerStartedAt = payload.startedAt;
+		timerStartedAt = Date.now();
 		timerDurationMs = payload.durationMs;
 		currentCategory = payload.category;
 
