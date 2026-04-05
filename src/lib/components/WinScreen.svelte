@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Button } from 'flowbite-svelte';
+
 	let {
 		winner
 	}: {
@@ -48,4 +50,6 @@
 			{/each}
 		</div>
 	</div>
+
+	<Button href="/" size="xl" outline color="purple" class="w-full">Back to menu</Button>
 </div>
