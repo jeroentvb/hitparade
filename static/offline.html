@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Hitparade — Offline</title>
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			body {
+				font-family:
+					system-ui,
+					-apple-system,
+					sans-serif;
+				background: #0f172a;
+				color: #e2e8f0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 100dvh;
+				padding: 2rem;
+				text-align: center;
+			}
+			.container {
+				max-width: 24rem;
+			}
+			h1 {
+				font-size: 1.5rem;
+				color: #7c3aed;
+				margin-bottom: 1rem;
+			}
+			p {
+				font-size: 1.125rem;
+				line-height: 1.6;
+				color: #94a3b8;
+			}
+			button {
+				margin-top: 1.5rem;
+				padding: 0.75rem 1.5rem;
+				background: #7c3aed;
+				color: white;
+				border: none;
+				border-radius: 0.5rem;
+				font-size: 1rem;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>You're offline</h1>
+			<p>Connect to the internet to play Hitparade.</p>
+			<button onclick="location.reload()">Try again</button>
+		</div>
+	</body>
+</html>
