@@ -3,6 +3,9 @@ import { handler } from './build/handler.js';
 import { setupSocketIO } from './socket-setup.js';
 
 const server = createServer(handler);
+if (!globalThis.__hitparade_games) {
+	globalThis.__hitparade_games = new Map();
+}
 const gamesMap = globalThis.__hitparade_games;
 setupSocketIO(server, gamesMap);
 
