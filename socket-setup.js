@@ -157,6 +157,13 @@ function startRound(io, session) {
 	session.currentRound = round;
 	session.playedTrackUris.push(track.uri);
 
+	// Pause any currently playing track before spinning
+	if (session.pauseTrack && session.hostDeviceId) {
+		session.pauseTrack(session.hostDeviceId).catch((err) => {
+			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+		});
+	}
+
 	// Emit spin event
 	io.to(session.code).emit('round-spin', {
 		roundNumber,
