@@ -63,6 +63,15 @@ function parseDecade(input: string): number | null {
 	return null;
 }
 
+function cleanSongTitle(title: string): string {
+	return title
+		.replace(/\s+[-–—]\s+.*$/, '')
+		.replace(/\s+\(.*$/, '')
+		.replace(/\s+feat\.?\s.*$/i, '')
+		.replace(/\s+ft\.?\s.*$/i, '')
+		.trim();
+}
+
 function fuzzyMatch(guess: string, correct: string, threshold: number): boolean {
 	const g = guess.toLowerCase().trim();
 	const c = correct.toLowerCase().trim();
@@ -146,8 +155,11 @@ export function checkAnswer(
 		}
 
 		case 'song-title': {
-			const correct = fuzzyMatch(trimmed, track.name, fuzzyThreshold);
-			return result(correct, false, trimmed, track.name);
+			const cleaned = cleanSongTitle(track.name);
+			const correct =
+				fuzzyMatch(trimmed, cleaned, fuzzyThreshold) ||
+				fuzzyMatch(trimmed, track.name, fuzzyThreshold);
+			return result(correct, false, trimmed, cleaned);
 		}
 
 		case 'artist-name': {
@@ -172,7 +184,7 @@ function getFallbackCorrectAnswer(category: CategorySlug, track: Track): string 
 		case 'decade':
 			return `${track.releaseYear - (track.releaseYear % 10)}s`;
 		case 'song-title':
-			return track.name;
+			return cleanSongTitle(track.name);
 		case 'artist-name':
 			return track.artists[0] ?? '';
 	}
