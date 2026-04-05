@@ -133,6 +133,8 @@
 		registerPlayer(data.game.code, data.player.nickname, (res) => {
 			if (!res.ok) {
 				error = res.error ?? 'Failed to register';
+			} else if (data.player.isHost) {
+				loadDevices();
 			}
 		});
 	}
@@ -316,10 +318,7 @@
 		onGamePaused(handleGamePaused);
 		onScoresUpdate(handleScoresUpdate);
 
-		// Load devices for host
-		if (data.player.isHost) {
-			loadDevices();
-		}
+		// Devices are loaded after registration succeeds (in doRegister)
 	});
 
 	onDestroy(() => {
