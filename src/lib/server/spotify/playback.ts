@@ -13,7 +13,13 @@ export async function play(sessionId: string, trackUri: string, deviceId: string
 
 export async function pause(sessionId: string, deviceId: string) {
 	const client = getClient(sessionId);
-	await client.player.pausePlayback(deviceId);
+	try {
+		await client.player.pausePlayback(deviceId);
+	} catch (e) {
+		// Spotify returns 204 No Content for pause, but the SDK tries to JSON.parse the empty body.
+		// The pause still succeeds, so ignore the parse error.
+		if (!(e instanceof SyntaxError)) throw e;
+	}
 }
 
 export async function resume(sessionId: string, deviceId: string) {
