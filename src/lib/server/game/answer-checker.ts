@@ -53,8 +53,8 @@ function parseDecade(input: string): number | null {
 		return year - (year % 10);
 	}
 
-	// "80s", "'80s", "80's"
-	const shortMatch = normalized.match(/'?(\d{2})(?:'?s)/);
+	// "80s", "'80s", "80's", "80"
+	const shortMatch = normalized.match(/'?(\d{2})(?:'?s)?/);
 	if (shortMatch) {
 		const n = parseInt(shortMatch[1], 10);
 		return n < 30 ? 2000 + n : 1900 + n;
