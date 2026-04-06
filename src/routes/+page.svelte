@@ -21,4 +21,8 @@
 		<Button href="/host/setup" size="xl" color="purple" class="min-w-48">Start a game</Button>
 		<Button href="/join" size="xl" outline color="purple" class="min-w-48">Join a game</Button>
 	</div>
+
+	<a href="/rules" class="mt-6 text-sm text-slate-400 underline hover:text-slate-200">
+		How does it work?
+	</a>
 </main>
