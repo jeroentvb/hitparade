@@ -33,6 +33,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Spotify session expired' }, { status: 401 });
 	}
 
+	const profile = await client.currentUser.profile();
+	if (profile.product !== 'premium') {
+		return json({ error: 'Spotify Premium is required to host a game' }, { status: 403 });
+	}
+
 	const [{ tracks }, playlist] = await Promise.all([
 		fetchPlaylistTracks(client, playlistId),
 		client.playlists.getPlaylist(playlistId)
