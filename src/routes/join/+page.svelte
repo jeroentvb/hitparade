@@ -47,7 +47,7 @@
 	<div class="w-full max-w-md space-y-8">
 		<div class="text-center">
 			<h1
-				class="mb-2 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-300 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent"
+				class="mb-2 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-300 bg-clip-text pb-1 text-4xl font-extrabold tracking-tight text-transparent"
 			>
 				Join a Game
 			</h1>

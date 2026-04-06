@@ -20,7 +20,7 @@
 	<div>
 		<div class="mb-3 text-6xl">🎉</div>
 		<h1
-			class="bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-400 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent"
+			class="bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-400 bg-clip-text pb-1 text-4xl font-extrabold tracking-tight text-transparent"
 		>
 			Bingo!
 		</h1>
