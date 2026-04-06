@@ -10,6 +10,7 @@
 	import ReadyButton from '$lib/components/ReadyButton.svelte';
 	import WinScreen from '$lib/components/WinScreen.svelte';
 	import { categoriesForDifficulty } from '$lib/categories.js';
+	import { categoryColor } from '$lib/components/categoryColors.js';
 	import {
 		type CategoryInfo,
 		connect,
@@ -386,7 +387,10 @@
 				<div class="text-center">
 					<p class="text-sm text-slate-400">Round {roundNumber}</p>
 					{#if currentCategory && roundPhase !== 'spin'}
-						<h2 class="text-2xl font-bold text-white">{currentCategory.name}</h2>
+						<h2 class="flex items-center justify-center gap-2 text-2xl font-bold text-white">
+							<span class="inline-block h-3 w-3 rounded {categoryColor(currentCategory.slug).bg}"></span>
+							{currentCategory.name}
+						</h2>
 					{/if}
 				</div>
 
