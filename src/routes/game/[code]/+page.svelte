@@ -102,7 +102,7 @@
 	let gameOverData = $state<GameOverData | null>(null);
 	let gamePaused = $state(false);
 	let scores = $state<ScoreboardEntry[]>([]);
-	let otherScorecards = $state<ScorecardSummary[]>([]);
+	let allScorecards = $state<ScorecardSummary[]>([]);
 	let spinAnimating = $state(false);
 	let currentInputValue = $state('');
 
@@ -113,6 +113,11 @@
 
 	// Categories for the spinner (from game config difficulty)
 	const difficultyCategories = $derived(categoriesForDifficulty(lobby.config.difficulty));
+
+	// Other players' scorecards (exclude own card)
+	const otherScorecards = $derived(
+		allScorecards.filter((s) => s.nickname.toLowerCase() !== data.player.nickname.toLowerCase())
+	);
 
 	// --- Lobby handlers ---
 
@@ -272,9 +277,7 @@
 	}
 
 	function handleScorecardsUpdate(summaries: ScorecardSummary[]) {
-		otherScorecards = summaries.filter(
-			(s) => s.nickname.toLowerCase() !== data.player.nickname.toLowerCase()
-		);
+		allScorecards = summaries;
 	}
 
 	// --- User actions ---
@@ -366,7 +369,7 @@
 <main class="flex flex-1 flex-col items-center px-4 py-8">
 	<div class="w-full max-w-lg space-y-6">
 		{#if gameWinner}
-			<WinScreen winner={gameWinner} />
+			<WinScreen winner={gameWinner} scorecards={allScorecards} categories={difficultyCategories} />
 		{:else if gameOverData}
 			<!-- Game over screen -->
 			<div class="space-y-6 text-center">

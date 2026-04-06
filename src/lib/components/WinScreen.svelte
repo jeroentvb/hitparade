@@ -1,18 +1,26 @@
 <script lang="ts">
 	import { Button } from 'flowbite-svelte';
+	import type { ScorecardSummary } from '$lib/socket.svelte';
+	import Scorecard from './Scorecard.svelte';
+	import OtherScorecards from './OtherScorecards.svelte';
 
 	let {
-		winner
+		winner,
+		scorecards = [],
+		categories = []
 	}: {
 		winner: {
 			nickname: string;
 			winningLine: number[];
 			scoreboard: { nickname: string; score: number }[];
 		};
+		scorecards?: ScorecardSummary[];
+		categories?: readonly { slug: string; name: string }[];
 	} = $props();
 
-	// We don't have the winner's scorecard here, only the winning line.
-	// The WinScreen shows the celebration + final scores.
+	const winnerCard = $derived(scorecards.find((s) => s.nickname === winner.nickname) ?? null);
+
+	const otherCards = $derived(scorecards.filter((s) => s.nickname !== winner.nickname));
 </script>
 
 <div class="space-y-6 text-center">
@@ -26,6 +34,21 @@
 		</h1>
 		<p class="mt-2 text-xl font-semibold text-white">{winner.nickname} wins!</p>
 	</div>
+
+	<!-- Winner's scorecard -->
+	{#if winnerCard}
+		<div>
+			<h3 class="mb-2 text-sm font-medium tracking-wide text-slate-400 uppercase">
+				{winner.nickname}'s winning card
+			</h3>
+			<Scorecard cells={winnerCard.cells} {categories} winningLine={winnerCard.winningLine} />
+		</div>
+	{/if}
+
+	<!-- Other players' scorecards -->
+	{#if otherCards.length > 0}
+		<OtherScorecards scorecards={otherCards} {categories} />
+	{/if}
 
 	<!-- Final Scores -->
 	<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
