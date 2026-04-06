@@ -199,6 +199,14 @@ export function offScoresUpdate(handler: (data: ScoreboardEntry[]) => void): voi
 	getSocket().off('scores-update', handler);
 }
 
+export function onScorecardsUpdate(handler: (data: ScorecardSummary[]) => void): void {
+	getSocket().on('scorecards-update', handler);
+}
+
+export function offScorecardsUpdate(handler: (data: ScorecardSummary[]) => void): void {
+	getSocket().off('scorecards-update', handler);
+}
+
 // --- Types ---
 
 interface LobbyPlayer {
@@ -294,4 +302,10 @@ export interface GameOverData {
 
 export interface GamePausedData {
 	reason: string;
+}
+
+export interface ScorecardSummary {
+	nickname: string;
+	cells: { category: CategorySlug; marked: boolean }[];
+	winningLine: number[] | null;
 }

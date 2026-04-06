@@ -1,7 +1,7 @@
 <script lang="ts">
-	import {onMount} from 'svelte';
-	import {Alert, Button, Input, Label, Radio, Spinner} from 'flowbite-svelte';
-	import {CheckCircleOutline, SearchOutline} from 'flowbite-svelte-icons';
+	import { onMount } from 'svelte';
+	import { Alert, Button, Input, Label, Radio, Spinner } from 'flowbite-svelte';
+	import { CheckCircleOutline, SearchOutline } from 'flowbite-svelte-icons';
 
 	interface PlaylistSummary {
 		id: string;

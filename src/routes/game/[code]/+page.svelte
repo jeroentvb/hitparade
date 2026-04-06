@@ -9,6 +9,7 @@
 	import ResultBanner from '$lib/components/ResultBanner.svelte';
 	import ReadyButton from '$lib/components/ReadyButton.svelte';
 	import WinScreen from '$lib/components/WinScreen.svelte';
+	import OtherScorecards from '$lib/components/OtherScorecards.svelte';
 	import { categoriesForDifficulty } from '$lib/categories.js';
 	import { categoryColor } from '$lib/components/categoryColors.js';
 	import {
@@ -31,6 +32,7 @@
 		offPlayerReadied,
 		offRoundReveal,
 		offRoundSpin,
+		offScorecardsUpdate,
 		offScoresUpdate,
 		offTimerStarted,
 		onAnswerSubmitted,
@@ -43,6 +45,7 @@
 		onPlayerReadied,
 		onRoundReveal,
 		onRoundSpin,
+		onScorecardsUpdate,
 		onScoresUpdate,
 		onTimerStarted,
 		placeCross,
@@ -52,10 +55,12 @@
 		type RoundRevealData,
 		type ScoreboardEntry,
 		type ScorecardCell,
+		type ScorecardSummary,
 		setDeviceId,
 		startGame,
 		submitAnswer
 	} from '$lib/socket.svelte';
+	import type { RoundPhase } from '$lib/server/game';
 
 	let { data } = $props();
 
@@ -78,7 +83,7 @@
 
 	// --- Game round state ---
 	let scorecard = $state<ScorecardCell[] | null>(null);
-	let roundPhase = $state<string | null>(null);
+	let roundPhase = $state<RoundPhase | null>(null);
 	let roundNumber = $state(0);
 	let currentCategory = $state<CategoryInfo | null>(null);
 	let timerStartedAt = $state(0);
@@ -97,6 +102,7 @@
 	let gameOverData = $state<GameOverData | null>(null);
 	let gamePaused = $state(false);
 	let scores = $state<ScoreboardEntry[]>([]);
+	let otherScorecards = $state<ScorecardSummary[]>([]);
 	let spinAnimating = $state(false);
 	let currentInputValue = $state('');
 
@@ -265,6 +271,12 @@
 		scores = [...data].sort((a, b) => b.score - a.score);
 	}
 
+	function handleScorecardsUpdate(summaries: ScorecardSummary[]) {
+		otherScorecards = summaries.filter(
+			(s) => s.nickname.toLowerCase() !== data.player.nickname.toLowerCase()
+		);
+	}
+
 	// --- User actions ---
 
 	function handleSubmitAnswer(answer: string) {
@@ -318,6 +330,7 @@
 		onGameOver(handleGameOver);
 		onGamePaused(handleGamePaused);
 		onScoresUpdate(handleScoresUpdate);
+		onScorecardsUpdate(handleScorecardsUpdate);
 
 		// Devices are loaded after registration succeeds (in doRegister)
 	});
@@ -337,6 +350,7 @@
 		offGameOver(handleGameOver);
 		offGamePaused(handleGamePaused);
 		offScoresUpdate(handleScoresUpdate);
+		offScorecardsUpdate(handleScorecardsUpdate);
 		disconnect();
 
 		if (timerInterval) {
@@ -388,7 +402,8 @@
 					<p class="text-sm text-slate-400">Round {roundNumber}</p>
 					{#if currentCategory && roundPhase !== 'spin'}
 						<h2 class="flex items-center justify-center gap-2 text-2xl font-bold text-white">
-							<span class="inline-block h-3 w-3 rounded {categoryColor(currentCategory.slug).bg}"></span>
+							<span class="inline-block h-3 w-3 rounded {categoryColor(currentCategory.slug).bg}"
+							></span>
 							{currentCategory.name}
 						</h2>
 					{/if}
@@ -528,6 +543,10 @@
 						<h3 class="mb-2 text-center text-sm font-medium text-slate-400">Your Scorecard</h3>
 						<Scorecard cells={scorecard} categories={difficultyCategories} />
 					</div>
+				{/if}
+
+				{#if otherScorecards.length > 0}
+					<OtherScorecards scorecards={otherScorecards} categories={difficultyCategories} />
 				{/if}
 			</div>
 		{:else}

@@ -112,6 +112,18 @@ function buildScoreboard(session) {
 }
 
 /**
+ * Build a summary of all players' scorecards for broadcasting.
+ * @param {GameSession} session
+ */
+function buildScorecardsSummary(session) {
+	return session.players.map((p) => ({
+		nickname: p.nickname,
+		cells: p.scorecard ? p.scorecard.map((c) => ({ category: c.category, marked: c.marked })) : [],
+		winningLine: p.scorecard ? checkBingo(p.scorecard) : null
+	}));
+}
+
+/**
  * Start a new round: pick category + track, emit spin, schedule playback.
  * @param {Server} io
  * @param {GameSession} session
@@ -451,6 +463,7 @@ export function setupSocketIO(httpServer, gamesMap) {
 				});
 			}
 			io.to(session.code).emit('scores-update', buildScoreboard(session));
+			io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
 			console.log(`[socket.io] game ${code} started`);
 			if (typeof callback === 'function') callback({ ok: true });
 
@@ -581,6 +594,7 @@ export function setupSocketIO(httpServer, gamesMap) {
 						winningLine,
 						scoreboard: buildScoreboard(session)
 					});
+					io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
 					if (typeof callback === 'function') callback({ ok: true, marked: cellIndex });
 					return;
 				}
@@ -589,6 +603,7 @@ export function setupSocketIO(httpServer, gamesMap) {
 
 				// Emit updated scores
 				io.to(session.code).emit('scores-update', buildScoreboard(session));
+				io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
 
 				// Emit updated ready count
 				const connected = connectedPlayers(session);
