@@ -18,7 +18,13 @@ export async function pause(sessionId: string, deviceId: string) {
 	} catch (e) {
 		// Spotify returns 204 No Content for pause, but the SDK tries to JSON.parse the empty body.
 		// The pause still succeeds, so ignore the parse error.
-		if (!(e instanceof SyntaxError)) throw e;
+		if (e instanceof SyntaxError) return;
+
+		// Spotify returns 403 "Restriction violated" when nothing is currently playing.
+		// This is expected on the first round before any track has been played.
+		if (e instanceof Error && e.message.includes('Restriction violated')) return;
+
+		throw e;
 	}
 }
 
