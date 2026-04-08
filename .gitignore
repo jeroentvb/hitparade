@@ -25,7 +25,10 @@ vite.config.ts.timestamp-*
 .idea
 .vscode
 
-docs
+docs/local
+docs/specs
+docs/tasks
+docs/backlog.md
 prototype
 .claude
 
