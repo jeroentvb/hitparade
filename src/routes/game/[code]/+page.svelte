@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import { beforeNavigate } from '$app/navigation';
 	import { Alert, Button, Spinner } from 'flowbite-svelte';
 	import DiscoSpinner from '$lib/components/DiscoSpinner.svelte';
 	import SongCard from '$lib/components/SongCard.svelte';
@@ -63,6 +64,13 @@
 	import type { RoundPhase } from '$lib/server/game';
 
 	let { data } = $props();
+
+	beforeNavigate((navigation) => {
+		if (gameWinner || gameOverData) return;
+		if (navigation.type === 'popstate' || navigation.type === 'leave') {
+			navigation.cancel();
+		}
+	});
 
 	// --- Lobby state ---
 	// svelte-ignore state_referenced_locally
