@@ -1,6 +1,6 @@
 export type Difficulty = 'A' | 'B';
 
-export type GameStatus = 'lobby' | 'playing' | 'finished';
+export type GameStatus = 'lobby' | 'playing' | 'tiebreaker' | 'finished';
 
 export type RoundPhase = 'spin' | 'pre-play' | 'playing' | 'reveal' | 'cross-placement';
 
@@ -85,6 +85,11 @@ export interface AnswerResult {
 	correctAnswer: string;
 }
 
+export interface TiebreakerState {
+	contenderSocketIds: string[];
+	tiebreakerRound: number;
+}
+
 export interface GameSession {
 	code: string;
 	config: GameConfig;
@@ -94,6 +99,7 @@ export interface GameSession {
 	playedTrackUris: string[];
 	currentRound: RoundState | null;
 	status: GameStatus;
+	tiebreaker: TiebreakerState | null;
 	hostDeviceId: string | null;
 	playTrack: ((trackUri: string, deviceId: string) => Promise<void>) | null;
 	pauseTrack: ((deviceId: string) => Promise<void>) | null;

@@ -28,6 +28,7 @@ export function createGame(
 		playedTrackUris: [],
 		currentRound: null,
 		status: 'lobby',
+		tiebreaker: null,
 		hostDeviceId: null,
 		playTrack: null,
 		pauseTrack: null,

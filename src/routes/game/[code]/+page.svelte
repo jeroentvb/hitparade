@@ -35,6 +35,8 @@
 		offRoundSpin,
 		offScorecardsUpdate,
 		offScoresUpdate,
+		offTiebreakerStart,
+		offTiebreakerUpdate,
 		offTimerStarted,
 		onAnswerSubmitted,
 		onCrossPlacement,
@@ -48,6 +50,8 @@
 		onRoundSpin,
 		onScorecardsUpdate,
 		onScoresUpdate,
+		onTiebreakerStart,
+		onTiebreakerUpdate,
 		onTimerStarted,
 		placeCross,
 		type PlayerReadiedData,
@@ -59,7 +63,9 @@
 		type ScorecardSummary,
 		setDeviceId,
 		startGame,
-		submitAnswer
+		submitAnswer,
+		type TiebreakerStartData,
+		type TiebreakerUpdateData
 	} from '$lib/socket.svelte';
 	import type { RoundPhase } from '$lib/server/game';
 
@@ -113,6 +119,15 @@
 	let allScorecards = $state<ScorecardSummary[]>([]);
 	let spinAnimating = $state(false);
 	let currentInputValue = $state('');
+
+	// --- Tiebreaker state ---
+	let isTiebreaker = $state(false);
+	let tiebreakerContenders = $state<string[]>([]);
+	let tiebreakerRound = $state(0);
+
+	const isSpectator = $derived(
+		isTiebreaker && !tiebreakerContenders.includes(data.player.nickname)
+	);
 
 	// Derived: the current player's result from reveal data
 	const myResult = $derived(
@@ -269,11 +284,15 @@
 	function handleGameWon(payload: GameWonData) {
 		gameWinner = payload;
 		roundPhase = null;
+		isTiebreaker = false;
+		tiebreakerContenders = [];
 	}
 
 	function handleGameOver(payload: GameOverData) {
 		gameOverData = payload;
 		roundPhase = null;
+		isTiebreaker = false;
+		tiebreakerContenders = [];
 	}
 
 	function handleGamePaused() {
@@ -286,6 +305,17 @@
 
 	function handleScorecardsUpdate(summaries: ScorecardSummary[]) {
 		allScorecards = summaries;
+	}
+
+	function handleTiebreakerStart(payload: TiebreakerStartData) {
+		isTiebreaker = true;
+		tiebreakerContenders = payload.contenders;
+		tiebreakerRound = payload.tiebreakerRound;
+	}
+
+	function handleTiebreakerUpdate(payload: TiebreakerUpdateData) {
+		tiebreakerContenders = payload.remaining;
+		tiebreakerRound = payload.tiebreakerRound;
 	}
 
 	// --- User actions ---
@@ -342,6 +372,8 @@
 		onGamePaused(handleGamePaused);
 		onScoresUpdate(handleScoresUpdate);
 		onScorecardsUpdate(handleScorecardsUpdate);
+		onTiebreakerStart(handleTiebreakerStart);
+		onTiebreakerUpdate(handleTiebreakerUpdate);
 
 		// Devices are loaded after registration succeeds (in doRegister)
 	});
@@ -362,6 +394,8 @@
 		offGamePaused(handleGamePaused);
 		offScoresUpdate(handleScoresUpdate);
 		offScorecardsUpdate(handleScorecardsUpdate);
+		offTiebreakerStart(handleTiebreakerStart);
+		offTiebreakerUpdate(handleTiebreakerUpdate);
 		disconnect();
 
 		if (timerInterval) {
@@ -386,8 +420,17 @@
 					<p class="text-slate-400">
 						{gameOverData.reason === 'no-tracks'
 							? 'No more tracks left in the playlist!'
-							: 'The game has ended.'}
+							: gameOverData.reason === 'tiebreaker-draw'
+								? 'Tiebreaker ended in a draw!'
+								: gameOverData.reason === 'all-contenders-left'
+									? 'All tiebreaker contenders disconnected.'
+									: 'The game has ended.'}
 					</p>
+					{#if gameOverData.coWinners && gameOverData.coWinners.length > 0}
+						<p class="mt-1 text-sm text-yellow-300">
+							Co-winners: {gameOverData.coWinners.join(', ')}
+						</p>
+					{/if}
 				</div>
 				<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
 					<h3 class="mb-2 text-sm font-medium text-slate-400">Final Scores</h3>
@@ -419,6 +462,17 @@
 						</h2>
 					{/if}
 				</div>
+
+				{#if isTiebreaker}
+					<div class="rounded-lg border border-yellow-600 bg-yellow-900/30 px-4 py-3 text-center">
+						<p class="text-sm font-bold tracking-wide text-yellow-300 uppercase">
+							Tiebreaker Round {tiebreakerRound}
+						</p>
+						<p class="mt-1 text-xs text-yellow-200/70">
+							{tiebreakerContenders.join(' vs ')}
+						</p>
+					</div>
+				{/if}
 
 				<!-- Score pills -->
 				{#if scores.length > 0}
@@ -455,7 +509,9 @@
 					<div class="space-y-5">
 						<Timer remaining={timerRemaining} duration={timerDurationMs} />
 
-						{#if !answerSubmitted && currentCategory}
+						{#if isSpectator}
+							<p class="text-center text-lg text-slate-400">Watching tiebreaker...</p>
+						{:else if !answerSubmitted && currentCategory}
 							<AnswerInput
 								category={currentCategory}
 								onsubmit={handleSubmitAnswer}
@@ -544,7 +600,7 @@
 					<!-- Waiting state between phases -->
 					<div class="flex items-center justify-center gap-2 text-slate-400">
 						<Spinner size="5" />
-						<span>Starting next round...</span>
+						<span>{isTiebreaker ? 'Next tiebreaker round...' : 'Starting next round...'}</span>
 					</div>
 				{/if}
 

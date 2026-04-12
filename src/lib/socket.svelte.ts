@@ -207,6 +207,24 @@ export function offScorecardsUpdate(handler: (data: ScorecardSummary[]) => void)
 	getSocket().off('scorecards-update', handler);
 }
 
+// --- Tiebreaker events ---
+
+export function onTiebreakerStart(handler: (data: TiebreakerStartData) => void): void {
+	getSocket().on('tiebreaker-start', handler);
+}
+
+export function offTiebreakerStart(handler: (data: TiebreakerStartData) => void): void {
+	getSocket().off('tiebreaker-start', handler);
+}
+
+export function onTiebreakerUpdate(handler: (data: TiebreakerUpdateData) => void): void {
+	getSocket().on('tiebreaker-update', handler);
+}
+
+export function offTiebreakerUpdate(handler: (data: TiebreakerUpdateData) => void): void {
+	getSocket().off('tiebreaker-update', handler);
+}
+
 // --- Types ---
 
 interface LobbyPlayer {
@@ -298,6 +316,7 @@ export interface GameWonData {
 export interface GameOverData {
 	reason: string;
 	scoreboard: ScoreboardEntry[];
+	coWinners?: string[];
 }
 
 export interface GamePausedData {
@@ -308,4 +327,15 @@ export interface ScorecardSummary {
 	nickname: string;
 	cells: { category: CategorySlug; marked: boolean }[];
 	winningLine: number[] | null;
+}
+
+export interface TiebreakerStartData {
+	contenders: string[];
+	tiebreakerRound: number;
+}
+
+export interface TiebreakerUpdateData {
+	eliminated: string[];
+	remaining: string[];
+	tiebreakerRound: number;
 }

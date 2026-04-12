@@ -92,11 +92,16 @@ function connectedPlayers(session) {
  * @param {GameSession} session
  */
 function checkAllReady(io, session) {
+	if (session.status === 'tiebreaker') return; // tiebreaker auto-advances
 	const connected = connectedPlayers(session);
 	if (connected.length === 0) return;
 	if (connected.every((p) => p.ready)) {
-		const timer = setTimeout(() => startRound(io, session), 3000);
-		addTimer(session.code, timer);
+		if (session.currentRound?.phase === 'cross-placement') {
+			checkBingoAfterCrossPlacement(io, session);
+		} else {
+			const timer = setTimeout(() => startRound(io, session), 3000);
+			addTimer(session.code, timer);
+		}
 	}
 }
 
@@ -331,6 +336,316 @@ function startCrossPlacement(io, session, round) {
 }
 
 /**
+ * After all players are ready in cross-placement, check ALL scorecards for bingo.
+ * If multiple players have bingo, initiate a tiebreaker.
+ * @param {Server} io
+ * @param {GameSession} session
+ */
+function checkBingoAfterCrossPlacement(io, session) {
+	/** @type {{ player: Player; winningLine: number[] }[]} */
+	const playersWithBingo = [];
+	for (const player of session.players) {
+		if (player.scorecard) {
+			const winningLine = checkBingo(player.scorecard);
+			if (winningLine) {
+				playersWithBingo.push({ player, winningLine });
+			}
+		}
+	}
+
+	if (playersWithBingo.length === 0) {
+		// No bingo — continue to next round
+		const timer = setTimeout(() => startRound(io, session), 3000);
+		addTimer(session.code, timer);
+	} else if (playersWithBingo.length === 1) {
+		// Single winner
+		const { player, winningLine } = playersWithBingo[0];
+		session.status = 'finished';
+		clearGameTimers(session.code);
+		if (session.pauseTrack && session.hostDeviceId) {
+			session.pauseTrack(session.hostDeviceId).catch((err) => {
+				console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+			});
+		}
+		io.to(session.code).emit('game-won', {
+			nickname: player.nickname,
+			winningLine,
+			scoreboard: buildScoreboard(session)
+		});
+		io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
+	} else {
+		// Multiple bingos — tiebreaker!
+		initiateTiebreaker(io, session, playersWithBingo);
+	}
+}
+
+/**
+ * Start a tiebreaker when multiple players achieve bingo simultaneously.
+ * @param {Server} io
+ * @param {GameSession} session
+ * @param {{ player: Player; winningLine: number[] }[]} playersWithBingo
+ */
+function initiateTiebreaker(io, session, playersWithBingo) {
+	session.status = 'tiebreaker';
+	session.tiebreaker = {
+		contenderSocketIds: playersWithBingo.map((p) => p.player.socketId),
+		tiebreakerRound: 0
+	};
+
+	if (session.pauseTrack && session.hostDeviceId) {
+		session.pauseTrack(session.hostDeviceId).catch((err) => {
+			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+		});
+	}
+
+	io.to(session.code).emit('tiebreaker-start', {
+		contenders: playersWithBingo.map((p) => p.player.nickname),
+		tiebreakerRound: 1
+	});
+	io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
+
+	const timer = setTimeout(() => startTiebreakerRound(io, session), 5000);
+	addTimer(session.code, timer);
+}
+
+/**
+ * Start a tiebreaker round: pick category + track, emit spin, schedule playback.
+ * @param {Server} io
+ * @param {GameSession} session
+ */
+function startTiebreakerRound(io, session) {
+	if (session.status !== 'tiebreaker' || !session.tiebreaker) return;
+
+	session.tiebreaker.tiebreakerRound++;
+
+	for (const player of session.players) {
+		player.ready = false;
+	}
+
+	const track = pickRandomTrack(session);
+	if (!track) {
+		resolveTiebreakerByScore(io, session);
+		return;
+	}
+
+	const category = pickRandomCategory(session);
+	const roundNumber = session.currentRound ? session.currentRound.roundNumber + 1 : 1;
+
+	/** @type {RoundState} */
+	const round = {
+		roundNumber,
+		phase: 'spin',
+		selectedCategory: category.slug,
+		selectedTrack: track,
+		timer: null,
+		answers: [],
+		results: {}
+	};
+	session.currentRound = round;
+	session.playedTrackUris.push(track.uri);
+
+	if (session.pauseTrack && session.hostDeviceId) {
+		session.pauseTrack(session.hostDeviceId).catch((err) => {
+			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+		});
+	}
+
+	io.to(session.code).emit('round-spin', {
+		roundNumber,
+		category
+	});
+
+	const playTimer = setTimeout(async () => {
+		if (session.status !== 'tiebreaker' || session.currentRound !== round) return;
+
+		round.phase = 'pre-play';
+
+		if (session.playTrack && session.hostDeviceId) {
+			try {
+				await session.playTrack(track.uri, session.hostDeviceId);
+			} catch (err) {
+				console.error(`[game] Spotify playback failed for ${session.code}:`, err);
+			}
+		}
+
+		const startedAt = Date.now();
+		const durationMs = 30000;
+		round.timer = { startedAt, durationMs };
+		round.phase = 'playing';
+
+		io.to(session.code).emit('timer-started', {
+			startedAt,
+			durationMs,
+			category
+		});
+
+		const revealTimer = setTimeout(() => endTiebreakerRound(io, session, round), durationMs);
+		addTimer(session.code, revealTimer);
+	}, 8000);
+	addTimer(session.code, playTimer);
+}
+
+/**
+ * End a tiebreaker round: check answers, emit reveal, schedule evaluation.
+ * @param {Server} io
+ * @param {GameSession} session
+ * @param {RoundState} round
+ */
+function endTiebreakerRound(io, session, round) {
+	if (session.currentRound !== round || round.phase !== 'playing') return;
+
+	round.phase = 'reveal';
+
+	const track = /** @type {import('./src/lib/server/game/types.js').Track} */ (round.selectedTrack);
+	const category = /** @type {import('./src/lib/server/game/types.js').CategorySlug} */ (
+		round.selectedCategory
+	);
+
+	const playerResults = [];
+	for (const player of session.players) {
+		const submission = round.answers.find((a) => a.socketId === player.socketId);
+		const answer = submission ? submission.answer : '';
+		const result = checkAnswer(category, answer, track, session.config.fuzzyThreshold);
+		round.results[player.socketId] = result;
+		playerResults.push({
+			nickname: player.nickname,
+			answer: result.playerAnswer,
+			correct: result.correct,
+			exactYear: result.exactYear,
+			correctAnswer: result.correctAnswer
+		});
+	}
+
+	io.to(session.code).emit('round-reveal', {
+		roundNumber: round.roundNumber,
+		track: {
+			name: track.name,
+			artists: track.artists,
+			albumName: track.albumName,
+			releaseYear: track.releaseYear
+		},
+		category: {
+			slug: category,
+			name:
+				(session.config.difficulty === 'A' ? SIDE_A_CATEGORIES : SIDE_B_CATEGORIES).find(
+					(c) => c.slug === category
+				)?.name ?? category
+		},
+		results: playerResults
+	});
+
+	const evalTimer = setTimeout(() => evaluateTiebreaker(io, session, round), 5000);
+	addTimer(session.code, evalTimer);
+}
+
+/**
+ * Evaluate tiebreaker results: eliminate, narrow, or replay.
+ * @param {Server} io
+ * @param {GameSession} session
+ * @param {RoundState} round
+ */
+function evaluateTiebreaker(io, session, round) {
+	if (session.status !== 'tiebreaker' || !session.tiebreaker) return;
+
+	const contenderIds = session.tiebreaker.contenderSocketIds;
+	const correctContenders = contenderIds.filter((id) => {
+		const result = round.results[id];
+		return result?.correct;
+	});
+
+	if (correctContenders.length === 1) {
+		// Exactly one correct — winner!
+		const winner = session.players.find((p) => p.socketId === correctContenders[0]);
+		const winningLine = winner?.scorecard ? checkBingo(winner.scorecard) : null;
+		session.status = 'finished';
+		session.tiebreaker = null;
+		clearGameTimers(session.code);
+		if (session.pauseTrack && session.hostDeviceId) {
+			session.pauseTrack(session.hostDeviceId).catch((err) => {
+				console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+			});
+		}
+		io.to(session.code).emit('game-won', {
+			nickname: winner?.nickname ?? 'Unknown',
+			winningLine: winningLine ?? [],
+			scoreboard: buildScoreboard(session)
+		});
+		io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
+	} else if (correctContenders.length > 1) {
+		// Multiple correct — narrow contenders
+		const eliminated = contenderIds.filter((id) => !correctContenders.includes(id));
+		session.tiebreaker.contenderSocketIds = correctContenders;
+
+		io.to(session.code).emit('tiebreaker-update', {
+			eliminated: eliminated.map(
+				(id) => session.players.find((p) => p.socketId === id)?.nickname ?? 'Unknown'
+			),
+			remaining: correctContenders.map(
+				(id) => session.players.find((p) => p.socketId === id)?.nickname ?? 'Unknown'
+			),
+			tiebreakerRound: session.tiebreaker.tiebreakerRound
+		});
+
+		const timer = setTimeout(() => startTiebreakerRound(io, session), 5000);
+		addTimer(session.code, timer);
+	} else {
+		// Zero correct — all contenders continue
+		io.to(session.code).emit('tiebreaker-update', {
+			eliminated: [],
+			remaining: contenderIds.map(
+				(id) => session.players.find((p) => p.socketId === id)?.nickname ?? 'Unknown'
+			),
+			tiebreakerRound: session.tiebreaker.tiebreakerRound
+		});
+
+		const timer = setTimeout(() => startTiebreakerRound(io, session), 5000);
+		addTimer(session.code, timer);
+	}
+}
+
+/**
+ * Resolve tiebreaker when no tracks remain: highest-scoring contender wins.
+ * @param {Server} io
+ * @param {GameSession} session
+ */
+function resolveTiebreakerByScore(io, session) {
+	if (!session.tiebreaker) return;
+
+	const contenders = session.tiebreaker.contenderSocketIds
+		.map((id) => session.players.find((p) => p.socketId === id))
+		.filter(/** @param {Player | undefined} p @returns {p is Player} */ (p) => !!p);
+
+	const maxScore = Math.max(...contenders.map((p) => p.score));
+	const winners = contenders.filter((p) => p.score === maxScore);
+
+	session.status = 'finished';
+	session.tiebreaker = null;
+	clearGameTimers(session.code);
+	if (session.pauseTrack && session.hostDeviceId) {
+		session.pauseTrack(session.hostDeviceId).catch((err) => {
+			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
+		});
+	}
+
+	if (winners.length === 1) {
+		const winner = winners[0];
+		const winningLine = winner.scorecard ? checkBingo(winner.scorecard) : null;
+		io.to(session.code).emit('game-won', {
+			nickname: winner.nickname,
+			winningLine: winningLine ?? [],
+			scoreboard: buildScoreboard(session)
+		});
+	} else {
+		io.to(session.code).emit('game-over', {
+			reason: 'tiebreaker-draw',
+			scoreboard: buildScoreboard(session),
+			coWinners: winners.map((p) => p.nickname)
+		});
+	}
+	io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
+}
+
+/**
  * Attach Socket.IO to an HTTP server and set up room management.
  * @param {import('node:http').Server} httpServer
  * @param {Map<string, GameSession>} [gamesMap]
@@ -493,6 +808,15 @@ export function setupSocketIO(httpServer, gamesMap) {
 					return;
 				}
 
+				// During tiebreaker, only contenders can submit answers
+				if (session.status === 'tiebreaker' && session.tiebreaker) {
+					if (!session.tiebreaker.contenderSocketIds.includes(socket.id)) {
+						if (typeof callback === 'function')
+							callback({ ok: false, error: 'Spectators cannot submit answers' });
+						return;
+					}
+				}
+
 				// Check timer hasn't expired (5s grace period for slow connections)
 				if (round.timer) {
 					const elapsed = Date.now() - round.timer.startedAt;
@@ -584,21 +908,6 @@ export function setupSocketIO(httpServer, gamesMap) {
 				player.score += result.exactYear ? 2 : 1;
 				player.ready = true;
 
-				// Check for bingo
-				const winningLine = checkBingo(player.scorecard);
-				if (winningLine) {
-					session.status = 'finished';
-					clearGameTimers(session.code);
-					io.to(session.code).emit('game-won', {
-						nickname: player.nickname,
-						winningLine,
-						scoreboard: buildScoreboard(session)
-					});
-					io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
-					if (typeof callback === 'function') callback({ ok: true, marked: cellIndex });
-					return;
-				}
-
 				if (typeof callback === 'function') callback({ ok: true, marked: cellIndex });
 
 				// Emit updated scores
@@ -667,18 +976,71 @@ export function setupSocketIO(httpServer, gamesMap) {
 						const player = session.players.find((p) => p.socketId === socket.id);
 						if (!player) continue;
 
-						if (session.status === 'playing') {
+						if (session.status === 'playing' || session.status === 'tiebreaker') {
+							const disconnectedSocketId = player.socketId;
 							// During gameplay: mark as disconnected, don't remove
 							player.socketId = 'disconnected';
 							player.ready = true; // Count as ready
+
+							// Tiebreaker-specific: eliminate disconnected contender
+							if (session.status === 'tiebreaker' && session.tiebreaker) {
+								const tb = session.tiebreaker;
+								const idx = tb.contenderSocketIds.indexOf(disconnectedSocketId);
+								if (idx !== -1) {
+									tb.contenderSocketIds.splice(idx, 1);
+
+									if (tb.contenderSocketIds.length === 1) {
+										// Last contender standing wins
+										const lastContender = session.players.find(
+											(p) => p.socketId === tb.contenderSocketIds[0]
+										);
+										if (lastContender) {
+											session.status = 'finished';
+											const winningLine = lastContender.scorecard
+												? checkBingo(lastContender.scorecard)
+												: null;
+											clearGameTimers(session.code);
+											session.tiebreaker = null;
+											io.to(session.code).emit('game-won', {
+												nickname: lastContender.nickname,
+												winningLine: winningLine ?? [],
+												scoreboard: buildScoreboard(session)
+											});
+											io.to(session.code).emit(
+												'scorecards-update',
+												buildScorecardsSummary(session)
+											);
+										}
+									} else if (tb.contenderSocketIds.length === 0) {
+										// All contenders disconnected
+										session.status = 'finished';
+										clearGameTimers(session.code);
+										session.tiebreaker = null;
+										io.to(session.code).emit('game-over', {
+											reason: 'all-contenders-left',
+											scoreboard: buildScoreboard(session)
+										});
+									} else {
+										io.to(session.code).emit('tiebreaker-update', {
+											eliminated: [player.nickname],
+											remaining: tb.contenderSocketIds.map(
+												(id) =>
+													session.players.find((p) => p.socketId === id)?.nickname ?? 'Unknown'
+											),
+											tiebreakerRound: tb.tiebreakerRound
+										});
+									}
+								}
+							}
 
 							if (session.host.socketId === 'disconnected') {
 								// Host disconnected during game — pause
 								io.to(room).emit('game-paused', { reason: 'host-disconnected' });
 								// Set a 60s timeout to end the game
 								const pauseTimer = setTimeout(() => {
-									if (session.status !== 'playing') return;
+									if (session.status !== 'playing' && session.status !== 'tiebreaker') return;
 									session.status = 'finished';
+									session.tiebreaker = null;
 									if (session.pauseTrack && session.hostDeviceId) {
 										session.pauseTrack(session.hostDeviceId).catch((err) => {
 											console.error(`[game] Spotify pause failed for ${session.code}:`, err);
