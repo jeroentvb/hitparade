@@ -199,7 +199,7 @@ function startRound(io, session) {
 
 		// Start the answer timer regardless of playback success
 		const startedAt = Date.now();
-		const durationMs = 25000;
+		const durationMs = 30000;
 		round.timer = { startedAt, durationMs };
 		round.phase = 'playing';
 
