@@ -164,7 +164,7 @@ export function checkAnswer(
 
 		case 'artist-name': {
 			const primaryArtist = track.artists[0] ?? '';
-			const correct = fuzzyMatch(trimmed, primaryArtist, fuzzyThreshold);
+			const correct = track.artists.some((a) => fuzzyMatch(trimmed, a, fuzzyThreshold));
 			return result(correct, false, trimmed, primaryArtist);
 		}
 	}
