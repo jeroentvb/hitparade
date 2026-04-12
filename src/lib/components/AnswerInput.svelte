@@ -17,6 +17,14 @@
 		category.slug === 'single-or-multiple' || category.slug === 'before-2000'
 	);
 
+	const isNumeric = $derived(
+		category.slug === 'exact-year' ||
+			category.slug === '2-year-margin' ||
+			category.slug === '3-year-margin' ||
+			category.slug === '4-year-margin' ||
+			category.slug === 'decade'
+	);
+
 	const placeholder = $derived(
 		(() => {
 			switch (category.slug) {
@@ -100,6 +108,7 @@
 	<form onsubmit={handleTextSubmit} class="flex gap-2">
 		<input
 			type="text"
+			inputmode={isNumeric ? 'numeric' : 'text'}
 			bind:value
 			{placeholder}
 			{disabled}
