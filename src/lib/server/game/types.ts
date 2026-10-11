@@ -51,6 +51,7 @@ export type Scorecard = ScorecardCell[];
 
 export interface Player {
 	socketId: string;
+	previousSocketId?: string | null;
 	nickname: string;
 	scorecard: Scorecard | null;
 	score: number;
@@ -90,6 +91,15 @@ export interface TiebreakerState {
 	tiebreakerRound: number;
 }
 
+export interface FinishedData {
+	type: 'won' | 'over';
+	nickname?: string;
+	winningLine?: number[];
+	reason?: string;
+	scoreboard: { nickname: string; score: number }[];
+	coWinners?: string[];
+}
+
 export interface GameSession {
 	code: string;
 	config: GameConfig;
@@ -104,4 +114,6 @@ export interface GameSession {
 	playTrack: ((trackUri: string, deviceId: string) => Promise<void>) | null;
 	pauseTrack: ((deviceId: string) => Promise<void>) | null;
 	createdAt: number;
+	pauseTimer?: ReturnType<typeof setTimeout> | null;
+	finishedData?: FinishedData | null;
 }

@@ -126,7 +126,9 @@ export function startGame(code: string, socketId: string): GameSession {
 	const session = games.get(code.toUpperCase());
 	if (!session) throw new Error('Game not found');
 	if (session.host.socketId !== socketId) throw new Error('Only the host can start the game');
-	const connectedCount = session.players.filter((p) => p.socketId !== 'pending').length;
+	const connectedCount = session.players.filter(
+		(p) => p.socketId !== 'pending' && p.socketId !== 'disconnected'
+	).length;
 	if (connectedCount < 2) throw new Error('Need at least 2 connected players');
 	session.status = 'playing';
 	return session;
@@ -146,7 +148,7 @@ export function getLobbyState(code: string): LobbyState | undefined {
 		},
 		players: session.players.map((p) => ({
 			nickname: p.nickname,
-			connected: p.socketId !== 'pending'
+			connected: p.socketId !== 'pending' && p.socketId !== 'disconnected'
 		})),
 		hostNickname: session.host.nickname
 	};

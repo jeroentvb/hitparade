@@ -225,6 +225,24 @@ export function offTiebreakerUpdate(handler: (data: TiebreakerUpdateData) => voi
 	getSocket().off('tiebreaker-update', handler);
 }
 
+// --- Reconnection events ---
+
+export function onGameResumed(handler: () => void): void {
+	getSocket().on('game-resumed', handler);
+}
+
+export function offGameResumed(handler: () => void): void {
+	getSocket().off('game-resumed', handler);
+}
+
+export function onGameStateSync(handler: (data: GameStateSyncData) => void): void {
+	getSocket().on('game-state-sync', handler);
+}
+
+export function offGameStateSync(handler: (data: GameStateSyncData) => void): void {
+	getSocket().off('game-state-sync', handler);
+}
+
 // --- Types ---
 
 interface LobbyPlayer {
@@ -338,4 +356,30 @@ export interface TiebreakerUpdateData {
 	eliminated: string[];
 	remaining: string[];
 	tiebreakerRound: number;
+}
+
+export interface GameStateSyncData {
+	gameStarted: boolean;
+	status: string;
+	scorecard: ScorecardCell[] | null;
+	scores: ScoreboardEntry[];
+	allScorecards: ScorecardSummary[];
+	readyCount: number;
+	totalCount: number;
+	gamePaused: boolean;
+	roundNumber: number;
+	roundPhase: string | null;
+	category: CategoryInfo | null;
+	timerRemainingMs: number | null;
+	timerDurationMs: number | null;
+	answerSubmitted: boolean;
+	submittedCount: number;
+	revealData: RoundRevealData | null;
+	crossPlacementData: CrossPlacementData | null;
+	crossPlaced: boolean;
+	isTiebreaker: boolean;
+	tiebreakerContenders: string[];
+	tiebreakerRound: number;
+	gameWinner: GameWonData | null;
+	gameOverData: GameOverData | null;
 }

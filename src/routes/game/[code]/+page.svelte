@@ -65,7 +65,12 @@
 		startGame,
 		submitAnswer,
 		type TiebreakerStartData,
-		type TiebreakerUpdateData
+		type TiebreakerUpdateData,
+		onGameResumed,
+		offGameResumed,
+		onGameStateSync,
+		offGameStateSync,
+		type GameStateSyncData
 	} from '$lib/socket.svelte';
 	import type { RoundPhase } from '$lib/server/game';
 
@@ -299,6 +304,69 @@
 		gamePaused = true;
 	}
 
+	function handleGameResumed() {
+		gamePaused = false;
+	}
+
+	function handleGameStateSync(state: GameStateSyncData) {
+		gameStarted = state.gameStarted;
+		scorecard = state.scorecard;
+		scores = state.scores ? [...state.scores].sort((a, b) => b.score - a.score) : [];
+		allScorecards = state.allScorecards ?? [];
+		readyCount = state.readyCount;
+		totalPlayers = state.totalCount;
+		gamePaused = state.gamePaused;
+		roundNumber = state.roundNumber;
+		roundPhase = state.roundPhase as RoundPhase | null;
+		currentCategory = state.category;
+		answerSubmitted = state.answerSubmitted;
+		submittedCount = state.submittedCount;
+		revealData = state.revealData;
+		crossPlacementData = state.crossPlacementData;
+		crossPlaced = state.crossPlaced;
+
+		isTiebreaker = state.isTiebreaker;
+		tiebreakerContenders = state.tiebreakerContenders;
+		tiebreakerRound = state.tiebreakerRound;
+
+		gameWinner = state.gameWinner;
+		gameOverData = state.gameOverData;
+
+		if (timerInterval) {
+			clearInterval(timerInterval);
+			timerInterval = null;
+		}
+		if (
+			state.timerRemainingMs != null &&
+			state.timerRemainingMs > 0 &&
+			state.roundPhase === 'playing'
+		) {
+			timerStartedAt = Date.now();
+			timerDurationMs = state.timerRemainingMs;
+			timerRemaining = state.timerRemainingMs;
+
+			timerInterval = setInterval(() => {
+				const elapsed = Date.now() - timerStartedAt;
+				timerRemaining = Math.max(0, timerDurationMs - elapsed);
+				if (timerRemaining <= 0 && timerInterval) {
+					clearInterval(timerInterval);
+					timerInterval = null;
+					if (!answerSubmitted) {
+						handleSubmitAnswer(currentInputValue.trim());
+					}
+				}
+			}, 100);
+		}
+
+		spinAnimating = false;
+		if (spinHoldTimeout) {
+			clearTimeout(spinHoldTimeout);
+			spinHoldTimeout = null;
+		}
+
+		localReady = state.crossPlaced || false;
+	}
+
 	function handleScoresUpdate(data: ScoreboardEntry[]) {
 		scores = [...data].sort((a, b) => b.score - a.score);
 	}
@@ -374,6 +442,8 @@
 		onScorecardsUpdate(handleScorecardsUpdate);
 		onTiebreakerStart(handleTiebreakerStart);
 		onTiebreakerUpdate(handleTiebreakerUpdate);
+		onGameResumed(handleGameResumed);
+		onGameStateSync(handleGameStateSync);
 
 		// Devices are loaded after registration succeeds (in doRegister)
 	});
@@ -396,6 +466,8 @@
 		offScorecardsUpdate(handleScorecardsUpdate);
 		offTiebreakerStart(handleTiebreakerStart);
 		offTiebreakerUpdate(handleTiebreakerUpdate);
+		offGameResumed(handleGameResumed);
+		offGameStateSync(handleGameStateSync);
 		disconnect();
 
 		if (timerInterval) {

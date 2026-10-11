@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			},
 			players: game.players.map((p) => ({
 				nickname: p.nickname,
-				connected: p.socketId !== 'pending'
+				connected: p.socketId !== 'pending' && p.socketId !== 'disconnected'
 			})),
 			hostNickname: game.host.nickname
 		},

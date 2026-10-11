@@ -49,14 +49,13 @@
 			<li>The host picks a Spotify playlist and starts the game. Players join with a code.</li>
 			<li>Each player gets a unique 5&times;5 bingo card with colored category squares.</li>
 			<li>
-				A song plays and a category is spun &mdash; everyone guesses based on that category.
-				For example, you might need to guess the decade, the exact year, or whether it was
-				released before 2000. You have a limited time to submit your answer.
+				A song plays and a category is spun &mdash; everyone guesses based on that category. For
+				example, you might need to guess the decade, the exact year, or whether it was released
+				before 2000. You have a limited time to submit your answer.
 			</li>
 			<li>
-				Guess right and you get to place a cross on one of your card's matching category
-				squares. Get 5 crosses in a row &mdash; horizontally, vertically, or diagonally
-				&mdash; and you win!
+				Guess right and you get to place a cross on one of your card's matching category squares.
+				Get 5 crosses in a row &mdash; horizontally, vertically, or diagonally &mdash; and you win!
 			</li>
 		</ol>
 

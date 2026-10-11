@@ -87,6 +87,163 @@ function connectedPlayers(session) {
 }
 
 /**
+ * Migrate all socketId references from a player's previous socketId to their new one.
+ * Called when a player reconnects during gameplay and gets a new socket connection.
+ * @param {GameSession} session
+ * @param {Player} player
+ * @param {string} newSocketId
+ */
+function migratePlayerSocketId(session, player, newSocketId) {
+	const oldSocketId = player.previousSocketId || player.socketId;
+	if (oldSocketId === 'disconnected' || oldSocketId === 'pending') return;
+
+	player.previousSocketId = null;
+
+	const round = session.currentRound;
+	if (round) {
+		for (const answer of round.answers) {
+			if (answer.socketId === oldSocketId) {
+				answer.socketId = newSocketId;
+			}
+		}
+		if (round.results[oldSocketId] !== undefined) {
+			round.results[newSocketId] = round.results[oldSocketId];
+			delete round.results[oldSocketId];
+		}
+	}
+
+	if (session.tiebreaker) {
+		const idx = session.tiebreaker.contenderSocketIds.indexOf(oldSocketId);
+		if (idx !== -1) {
+			session.tiebreaker.contenderSocketIds[idx] = newSocketId;
+		}
+	}
+}
+
+/**
+ * Build a full game state snapshot for a reconnecting player.
+ * @param {GameSession} session
+ * @param {Player} player
+ */
+function buildGameStateForPlayer(session, player) {
+	const round = session.currentRound;
+	const connected = connectedPlayers(session);
+	const readyCount = session.players.filter((p) => p.ready).length;
+
+	const categoryList = session.config.difficulty === 'A' ? SIDE_A_CATEGORIES : SIDE_B_CATEGORIES;
+
+	const category = round?.selectedCategory
+		? {
+				slug: round.selectedCategory,
+				name:
+					categoryList.find((c) => c.slug === round.selectedCategory)?.name ??
+					round.selectedCategory
+			}
+		: null;
+
+	const revealData =
+		(round?.phase === 'reveal' || round?.phase === 'cross-placement') && round?.selectedTrack
+			? {
+					roundNumber: round.roundNumber,
+					track: {
+						name: round.selectedTrack.name,
+						artists: round.selectedTrack.artists,
+						albumName: round.selectedTrack.albumName,
+						releaseYear: round.selectedTrack.releaseYear
+					},
+					category,
+					results: session.players.map((p) => {
+						const result = round.results[p.socketId];
+						return {
+							nickname: p.nickname,
+							answer: result?.playerAnswer ?? '',
+							correct: result?.correct ?? false,
+							exactYear: result?.exactYear ?? false,
+							correctAnswer: result?.correctAnswer ?? ''
+						};
+					})
+				}
+			: null;
+
+	let crossPlacementData = null;
+	if (round?.phase === 'cross-placement') {
+		const result = round.results[player.socketId];
+		const correct = result?.correct ?? false;
+		if (correct && player.scorecard) {
+			const eligibleCells = [];
+			for (let i = 0; i < player.scorecard.length; i++) {
+				const cell = player.scorecard[i];
+				if (cell.category === round.selectedCategory && !cell.marked) {
+					eligibleCells.push(i);
+				}
+			}
+			crossPlacementData = { correct: true, cells: eligibleCells };
+		} else {
+			crossPlacementData = { correct: false, cells: [] };
+		}
+	}
+
+	let timerRemainingMs = null;
+	let timerDurationMs = null;
+	if (round?.timer && round.phase === 'playing') {
+		const elapsed = Date.now() - round.timer.startedAt;
+		timerRemainingMs = Math.max(0, round.timer.durationMs - elapsed);
+		timerDurationMs = round.timer.durationMs;
+	}
+
+	/** @type {*} */
+	let gameWinner = null;
+	/** @type {*} */
+	let gameOverData = null;
+
+	if (session.status === 'finished' && session.finishedData) {
+		if (session.finishedData.type === 'won') {
+			gameWinner = {
+				nickname: session.finishedData.nickname,
+				winningLine: session.finishedData.winningLine ?? [],
+				scoreboard: session.finishedData.scoreboard
+			};
+		} else {
+			gameOverData = {
+				reason: session.finishedData.reason,
+				scoreboard: session.finishedData.scoreboard,
+				coWinners: session.finishedData.coWinners
+			};
+		}
+	}
+
+	return {
+		gameStarted: session.status !== 'lobby',
+		status: session.status,
+		scorecard: player.scorecard,
+		scores: buildScoreboard(session),
+		allScorecards: buildScorecardsSummary(session),
+		readyCount,
+		totalCount: connected.length,
+		gamePaused: session.host.socketId === 'disconnected',
+		roundNumber: round?.roundNumber ?? 0,
+		roundPhase: round?.phase ?? null,
+		category,
+		timerRemainingMs,
+		timerDurationMs,
+		answerSubmitted: round ? round.answers.some((a) => a.socketId === player.socketId) : false,
+		submittedCount: round?.answers.length ?? 0,
+		revealData,
+		crossPlacementData,
+		crossPlaced: round?.phase === 'cross-placement' && player.ready,
+		isTiebreaker: session.status === 'tiebreaker',
+		tiebreakerContenders: session.tiebreaker
+			? session.tiebreaker.contenderSocketIds.map(
+					(id) => session.players.find((p) => p.socketId === id)?.nickname ?? 'Unknown'
+				)
+			: [],
+		tiebreakerRound: session.tiebreaker?.tiebreakerRound ?? 0,
+		gameWinner,
+		gameOverData
+	};
+}
+
+/**
  * Check if all connected players are ready. Start next round if so.
  * @param {Server} io
  * @param {GameSession} session
@@ -150,10 +307,9 @@ function startRound(io, session) {
 				console.error(`[game] Spotify pause failed for ${session.code}:`, err);
 			});
 		}
-		io.to(session.code).emit('game-over', {
-			reason: 'no-tracks',
-			scoreboard: buildScoreboard(session)
-		});
+		const scoreboard = buildScoreboard(session);
+		session.finishedData = { type: 'over', reason: 'no-tracks', scoreboard };
+		io.to(session.code).emit('game-over', { reason: 'no-tracks', scoreboard });
 		clearGameTimers(session.code);
 		return;
 	}
@@ -367,10 +523,12 @@ function checkBingoAfterCrossPlacement(io, session) {
 				console.error(`[game] Spotify pause failed for ${session.code}:`, err);
 			});
 		}
+		const scoreboard = buildScoreboard(session);
+		session.finishedData = { type: 'won', nickname: player.nickname, winningLine, scoreboard };
 		io.to(session.code).emit('game-won', {
 			nickname: player.nickname,
 			winningLine,
-			scoreboard: buildScoreboard(session)
+			scoreboard
 		});
 		io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
 	} else {
@@ -565,10 +723,17 @@ function evaluateTiebreaker(io, session, round) {
 				console.error(`[game] Spotify pause failed for ${session.code}:`, err);
 			});
 		}
+		const scoreboard = buildScoreboard(session);
+		session.finishedData = {
+			type: 'won',
+			nickname: winner?.nickname ?? 'Unknown',
+			winningLine: winningLine ?? [],
+			scoreboard
+		};
 		io.to(session.code).emit('game-won', {
 			nickname: winner?.nickname ?? 'Unknown',
 			winningLine: winningLine ?? [],
-			scoreboard: buildScoreboard(session)
+			scoreboard
 		});
 		io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
 	} else if (correctContenders.length > 1) {
@@ -627,19 +792,28 @@ function resolveTiebreakerByScore(io, session) {
 		});
 	}
 
+	const scoreboard = buildScoreboard(session);
 	if (winners.length === 1) {
 		const winner = winners[0];
 		const winningLine = winner.scorecard ? checkBingo(winner.scorecard) : null;
+		session.finishedData = {
+			type: 'won',
+			nickname: winner.nickname,
+			winningLine: winningLine ?? [],
+			scoreboard
+		};
 		io.to(session.code).emit('game-won', {
 			nickname: winner.nickname,
 			winningLine: winningLine ?? [],
-			scoreboard: buildScoreboard(session)
+			scoreboard
 		});
 	} else {
+		const coWinners = winners.map((p) => p.nickname);
+		session.finishedData = { type: 'over', reason: 'tiebreaker-draw', scoreboard, coWinners };
 		io.to(session.code).emit('game-over', {
 			reason: 'tiebreaker-draw',
-			scoreboard: buildScoreboard(session),
-			coWinners: winners.map((p) => p.nickname)
+			scoreboard,
+			coWinners
 		});
 	}
 	io.to(session.code).emit('scorecards-update', buildScorecardsSummary(session));
@@ -696,11 +870,42 @@ export function setupSocketIO(httpServer, gamesMap) {
 					return;
 				}
 
+				const isGameplay =
+					session.status === 'playing' ||
+					session.status === 'tiebreaker' ||
+					session.status === 'finished';
+
+				if (isGameplay) {
+					migratePlayerSocketId(session, player, socket.id);
+				}
+
 				player.socketId = socket.id;
 				socket.join(code.toUpperCase());
 				console.log(`[socket.io] ${socket.id} registered as "${nickname}" in ${code}`);
 
-				io.to(code.toUpperCase()).emit('lobby-update', lobbyState(session));
+				if (isGameplay) {
+					if (session.host === player && session.pauseTimer) {
+						clearTimeout(session.pauseTimer);
+						session.pauseTimer = null;
+						io.to(code.toUpperCase()).emit('game-resumed');
+						console.log(`[socket.io] host "${nickname}" reconnected, game resumed in ${code}`);
+					}
+
+					io.to(player.socketId).emit('game-state-sync', buildGameStateForPlayer(session, player));
+
+					io.to(code.toUpperCase()).emit('lobby-update', lobbyState(session));
+
+					const connected = connectedPlayers(session);
+					const readyCount = session.players.filter((p) => p.ready).length;
+					io.to(session.code).emit('player-readied', {
+						nickname: '',
+						readyCount,
+						totalCount: connected.length
+					});
+				} else {
+					io.to(code.toUpperCase()).emit('lobby-update', lobbyState(session));
+				}
+
 				if (typeof callback === 'function') callback({ ok: true });
 			}
 		);
@@ -979,6 +1184,7 @@ export function setupSocketIO(httpServer, gamesMap) {
 						if (session.status === 'playing' || session.status === 'tiebreaker') {
 							const disconnectedSocketId = player.socketId;
 							// During gameplay: mark as disconnected, don't remove
+							player.previousSocketId = player.socketId;
 							player.socketId = 'disconnected';
 							player.ready = true; // Count as ready
 
@@ -1001,10 +1207,17 @@ export function setupSocketIO(httpServer, gamesMap) {
 												: null;
 											clearGameTimers(session.code);
 											session.tiebreaker = null;
+											const scoreboard = buildScoreboard(session);
+											session.finishedData = {
+												type: 'won',
+												nickname: lastContender.nickname,
+												winningLine: winningLine ?? [],
+												scoreboard
+											};
 											io.to(session.code).emit('game-won', {
 												nickname: lastContender.nickname,
 												winningLine: winningLine ?? [],
-												scoreboard: buildScoreboard(session)
+												scoreboard
 											});
 											io.to(session.code).emit(
 												'scorecards-update',
@@ -1016,9 +1229,15 @@ export function setupSocketIO(httpServer, gamesMap) {
 										session.status = 'finished';
 										clearGameTimers(session.code);
 										session.tiebreaker = null;
+										const scoreboard = buildScoreboard(session);
+										session.finishedData = {
+											type: 'over',
+											reason: 'all-contenders-left',
+											scoreboard
+										};
 										io.to(session.code).emit('game-over', {
 											reason: 'all-contenders-left',
-											scoreboard: buildScoreboard(session)
+											scoreboard
 										});
 									} else {
 										io.to(session.code).emit('tiebreaker-update', {
@@ -1036,8 +1255,9 @@ export function setupSocketIO(httpServer, gamesMap) {
 							if (session.host.socketId === 'disconnected') {
 								// Host disconnected during game — pause
 								io.to(room).emit('game-paused', { reason: 'host-disconnected' });
-								// Set a 60s timeout to end the game
-								const pauseTimer = setTimeout(() => {
+								// Set a 60s timeout to end the game (stored on session for cancellation on reconnect)
+								session.pauseTimer = setTimeout(() => {
+									session.pauseTimer = null;
 									if (session.status !== 'playing' && session.status !== 'tiebreaker') return;
 									session.status = 'finished';
 									session.tiebreaker = null;
@@ -1047,12 +1267,13 @@ export function setupSocketIO(httpServer, gamesMap) {
 										});
 									}
 									clearGameTimers(session.code);
+									const scoreboard = buildScoreboard(session);
+									session.finishedData = { type: 'over', reason: 'host-left', scoreboard };
 									io.to(session.code).emit('game-over', {
 										reason: 'host-left',
-										scoreboard: buildScoreboard(session)
+										scoreboard
 									});
 								}, 60000);
-								addTimer(session.code, pauseTimer);
 							}
 
 							checkAllReady(io, session);
