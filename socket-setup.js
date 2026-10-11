@@ -16,6 +16,9 @@ import { checkBingo } from './src/lib/server/game/bingo.js';
 /** @type {Map<string, NodeJS.Timeout[]>} */
 const gameTimers = new Map();
 
+/** Game codes with a playback retry in flight (guards against double taps). */
+const retryingPlayback = new Set();
+
 /**
  * @param {string} code
  * @param {NodeJS.Timeout} timer
@@ -220,7 +223,13 @@ function buildGameStateForPlayer(session, player) {
 		allScorecards: buildScorecardsSummary(session),
 		readyCount,
 		totalCount: connected.length,
-		gamePaused: session.host.socketId === 'disconnected',
+		gamePaused: session.host.socketId === 'disconnected' || !!session.playbackFailed,
+		pauseReason:
+			session.host.socketId === 'disconnected'
+				? 'host-disconnected'
+				: session.playbackFailed
+					? 'playback-failed'
+					: null,
 		roundNumber: round?.roundNumber ?? 0,
 		roundPhase: round?.phase ?? null,
 		category,
@@ -330,12 +339,8 @@ function startRound(io, session) {
 	session.currentRound = round;
 	session.playedTrackUris.push(track.uri);
 
-	// Pause any currently playing track before spinning
-	if (session.pauseTrack && session.hostDeviceId) {
-		session.pauseTrack(session.hostDeviceId).catch((err) => {
-			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
-		});
-	}
+	// The previous track keeps playing during the spin. Pausing here lets iOS suspend
+	// the Spotify app, after which the device can no longer be reached for playback.
 
 	// Emit spin event
 	io.to(session.code).emit('round-spin', {
@@ -344,37 +349,71 @@ function startRound(io, session) {
 	});
 
 	// After 3s spin + 5s hold, start playback
-	const playTimer = setTimeout(async () => {
+	const playTimer = setTimeout(() => {
 		if (session.status !== 'playing' || session.currentRound !== round) return;
-
-		round.phase = 'pre-play';
-
-		// Try to play the track via Spotify
-		if (session.playTrack && session.hostDeviceId) {
-			try {
-				await session.playTrack(track.uri, session.hostDeviceId);
-			} catch (err) {
-				console.error(`[game] Spotify playback failed for ${session.code}:`, err);
-			}
-		}
-
-		// Start the answer timer regardless of playback success
-		const startedAt = Date.now();
-		const durationMs = 30000;
-		round.timer = { startedAt, durationMs };
-		round.phase = 'playing';
-
-		io.to(session.code).emit('timer-started', {
-			startedAt,
-			durationMs,
-			category
-		});
-
-		// Schedule reveal after timer expires
-		const revealTimer = setTimeout(() => endRound(io, session, round), durationMs);
-		addTimer(session.code, revealTimer);
+		beginPlayback(io, session, round);
 	}, 8000);
 	addTimer(session.code, playTimer);
+}
+
+/**
+ * Get the category info ({ slug, name }) for a category slug.
+ * @param {GameSession} session
+ * @param {string} slug
+ */
+function categoryInfo(session, slug) {
+	const categories = session.config.difficulty === 'A' ? SIDE_A_CATEGORIES : SIDE_B_CATEGORIES;
+	const cat = categories.find((c) => c.slug === slug);
+	return { slug, name: cat?.name ?? slug };
+}
+
+/**
+ * Play the round's track on the host's device and start the answer timer.
+ * If playback fails, the game is paused until the host picks a (working) device.
+ * @param {Server} io
+ * @param {GameSession} session
+ * @param {RoundState} round
+ * @returns {Promise<boolean>} whether playback started
+ */
+async function beginPlayback(io, session, round) {
+	round.phase = 'pre-play';
+
+	if (session.playTrack && session.hostDeviceId && round.selectedTrack) {
+		try {
+			await session.playTrack(round.selectedTrack.uri, session.hostDeviceId);
+		} catch (err) {
+			console.error(`[game] Spotify playback failed for ${session.code}:`, err);
+			if (session.currentRound !== round) return false;
+			session.playbackFailed = true;
+			io.to(session.code).emit('game-paused', { reason: 'playback-failed' });
+			return false;
+		}
+	}
+
+	// The game may have ended or moved on while waiting for Spotify
+	if (session.currentRound !== round || round.phase !== 'pre-play') return false;
+
+	if (session.playbackFailed) {
+		session.playbackFailed = false;
+		io.to(session.code).emit('game-resumed');
+	}
+
+	const startedAt = Date.now();
+	const durationMs = 30000;
+	round.timer = { startedAt, durationMs };
+	round.phase = 'playing';
+
+	io.to(session.code).emit('timer-started', {
+		startedAt,
+		durationMs,
+		category: categoryInfo(session, /** @type {string} */ (round.selectedCategory))
+	});
+
+	// Schedule reveal after timer expires
+	const end = session.status === 'tiebreaker' ? endTiebreakerRound : endRound;
+	const revealTimer = setTimeout(() => end(io, session, round), durationMs);
+	addTimer(session.code, revealTimer);
+	return true;
 }
 
 /**
@@ -602,43 +641,14 @@ function startTiebreakerRound(io, session) {
 	session.currentRound = round;
 	session.playedTrackUris.push(track.uri);
 
-	if (session.pauseTrack && session.hostDeviceId) {
-		session.pauseTrack(session.hostDeviceId).catch((err) => {
-			console.error(`[game] Spotify pause failed for ${session.code}:`, err);
-		});
-	}
-
 	io.to(session.code).emit('round-spin', {
 		roundNumber,
 		category
 	});
 
-	const playTimer = setTimeout(async () => {
+	const playTimer = setTimeout(() => {
 		if (session.status !== 'tiebreaker' || session.currentRound !== round) return;
-
-		round.phase = 'pre-play';
-
-		if (session.playTrack && session.hostDeviceId) {
-			try {
-				await session.playTrack(track.uri, session.hostDeviceId);
-			} catch (err) {
-				console.error(`[game] Spotify playback failed for ${session.code}:`, err);
-			}
-		}
-
-		const startedAt = Date.now();
-		const durationMs = 30000;
-		round.timer = { startedAt, durationMs };
-		round.phase = 'playing';
-
-		io.to(session.code).emit('timer-started', {
-			startedAt,
-			durationMs,
-			category
-		});
-
-		const revealTimer = setTimeout(() => endTiebreakerRound(io, session, round), durationMs);
-		addTimer(session.code, revealTimer);
+		beginPlayback(io, session, round);
 	}, 8000);
 	addTimer(session.code, playTimer);
 }
@@ -887,8 +897,13 @@ export function setupSocketIO(httpServer, gamesMap) {
 					if (session.host === player && session.pauseTimer) {
 						clearTimeout(session.pauseTimer);
 						session.pauseTimer = null;
-						io.to(code.toUpperCase()).emit('game-resumed');
-						console.log(`[socket.io] host "${nickname}" reconnected, game resumed in ${code}`);
+						if (session.playbackFailed) {
+							// Still paused: the host needs to fix playback first
+							io.to(code.toUpperCase()).emit('game-paused', { reason: 'playback-failed' });
+						} else {
+							io.to(code.toUpperCase()).emit('game-resumed');
+						}
+						console.log(`[socket.io] host "${nickname}" reconnected in ${code}`);
 					}
 
 					io.to(player.socketId).emit('game-state-sync', buildGameStateForPlayer(session, player));
@@ -912,7 +927,7 @@ export function setupSocketIO(httpServer, gamesMap) {
 
 		socket.on(
 			'set-device-id',
-			(/** @type {{ code: string; deviceId: string }} */ { code, deviceId }, callback) => {
+			async (/** @type {{ code: string; deviceId: string }} */ { code, deviceId }, callback) => {
 				if (!gamesMap) {
 					if (typeof callback === 'function') callback({ ok: false, error: 'Server not ready' });
 					return;
@@ -932,6 +947,33 @@ export function setupSocketIO(httpServer, gamesMap) {
 
 				session.hostDeviceId = deviceId;
 				console.log(`[socket.io] device set for game ${code}: ${deviceId}`);
+
+				// Game is paused because playback failed: retry the current round on this device
+				const round = session.currentRound;
+				if (session.playbackFailed && round?.phase === 'pre-play') {
+					if (retryingPlayback.has(session.code)) {
+						if (typeof callback === 'function')
+							callback({ ok: false, error: 'Already trying to start playback' });
+						return;
+					}
+					retryingPlayback.add(session.code);
+					const started = await beginPlayback(io, session, round).finally(() =>
+						retryingPlayback.delete(session.code)
+					);
+					if (typeof callback === 'function') {
+						callback(
+							started
+								? { ok: true }
+								: {
+										ok: false,
+										error:
+											'Spotify could not play on this device. Open Spotify on it and try again, or choose another device.'
+									}
+						);
+					}
+					return;
+				}
+
 				if (typeof callback === 'function') callback({ ok: true });
 			}
 		);

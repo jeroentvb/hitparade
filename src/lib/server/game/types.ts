@@ -115,5 +115,7 @@ export interface GameSession {
 	pauseTrack: ((deviceId: string) => Promise<void>) | null;
 	createdAt: number;
 	pauseTimer?: ReturnType<typeof setTimeout> | null;
+	/** Set when Spotify playback failed; the game is paused until the host picks a working device. */
+	playbackFailed?: boolean;
 	finishedData?: FinishedData | null;
 }

@@ -11,6 +11,7 @@
 	import ReadyButton from '$lib/components/ReadyButton.svelte';
 	import WinScreen from '$lib/components/WinScreen.svelte';
 	import OtherScorecards from '$lib/components/OtherScorecards.svelte';
+	import DevicePicker from '$lib/components/DevicePicker.svelte';
 	import { categoriesForDifficulty } from '$lib/categories.js';
 	import { categoryColor } from '$lib/components/categoryColors.js';
 	import {
@@ -19,10 +20,12 @@
 		type CrossPlacementData,
 		disconnect,
 		type GameOverData,
+		type GamePausedData,
 		type GameWonData,
 		getSocket,
 		isConnected,
 		type LobbyUpdate,
+		type PauseReason,
 		offAnswerSubmitted,
 		offCrossPlacement,
 		offGameOver,
@@ -120,6 +123,9 @@
 	let gameWinner = $state<GameWonData | null>(null);
 	let gameOverData = $state<GameOverData | null>(null);
 	let gamePaused = $state(false);
+	let pauseReason = $state<PauseReason | null>(null);
+	let retryingPlayback = $state(false);
+	let playbackError = $state('');
 	let scores = $state<ScoreboardEntry[]>([]);
 	let allScorecards = $state<ScorecardSummary[]>([]);
 	let spinAnimating = $state(false);
@@ -190,7 +196,8 @@
 				devices = (json.devices ?? [])
 					.filter((d: { id: string | null }) => d.id !== null)
 					.map((d: { id: string; name: string }) => ({ id: d.id, name: d.name }));
-				if (devices.length === 1) {
+				// Auto-select a lone device, but not while paused for playback: then the host chooses
+				if (devices.length === 1 && pauseReason !== 'playback-failed') {
 					selectedDeviceId = devices[0].id;
 					setDeviceId(data.game.code, selectedDeviceId);
 				}
@@ -201,12 +208,26 @@
 		loadingDevices = false;
 	}
 
-	function handleDeviceChange(event: Event) {
-		const target = event.target as HTMLSelectElement;
-		selectedDeviceId = target.value;
-		if (selectedDeviceId) {
+	function handleDeviceSelect(deviceId: string) {
+		selectedDeviceId = deviceId;
+		if (!selectedDeviceId) return;
+
+		if (pauseReason === 'playback-failed') {
+			retryPlayback();
+		} else {
 			setDeviceId(data.game.code, selectedDeviceId);
 		}
+	}
+
+	/** Ask the server to retry playback of the current round on the selected device. */
+	function retryPlayback() {
+		if (!selectedDeviceId || retryingPlayback) return;
+		retryingPlayback = true;
+		playbackError = '';
+		setDeviceId(data.game.code, selectedDeviceId, (res) => {
+			retryingPlayback = false;
+			if (!res.ok) playbackError = res.error ?? 'Playback failed';
+		});
 	}
 
 	// --- Round handlers ---
@@ -300,12 +321,17 @@
 		tiebreakerContenders = [];
 	}
 
-	function handleGamePaused() {
+	function handleGamePaused(payload: GamePausedData) {
 		gamePaused = true;
+		pauseReason = payload.reason;
+		// The device that failed may have dropped off the list, so refresh it for the host
+		if (payload.reason === 'playback-failed' && isHost) loadDevices();
 	}
 
 	function handleGameResumed() {
 		gamePaused = false;
+		pauseReason = null;
+		playbackError = '';
 	}
 
 	function handleGameStateSync(state: GameStateSyncData) {
@@ -316,6 +342,7 @@
 		readyCount = state.readyCount;
 		totalPlayers = state.totalCount;
 		gamePaused = state.gamePaused;
+		pauseReason = state.pauseReason;
 		roundNumber = state.roundNumber;
 		roundPhase = state.roundPhase as RoundPhase | null;
 		currentCategory = state.category;
@@ -517,8 +544,42 @@
 		{:else if gamePaused}
 			<div class="text-center">
 				<h1 class="mb-2 text-3xl font-bold text-yellow-300">Game Paused</h1>
-				<p class="text-slate-400">Waiting for the host to reconnect...</p>
-				<Spinner size="8" class="mt-4" />
+				{#if pauseReason === 'playback-failed' && isHost}
+					<p class="text-slate-400">
+						Spotify couldn't play the song on your device. Open Spotify on that device and try
+						again, or choose another device.
+					</p>
+					<section class="mt-6 rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left">
+						<h3 class="mb-2 text-sm font-medium text-white">Spotify Device</h3>
+						<DevicePicker
+							{devices}
+							{selectedDeviceId}
+							loading={loadingDevices}
+							disabled={retryingPlayback}
+							onSelect={handleDeviceSelect}
+							onRefresh={loadDevices}
+						/>
+					</section>
+					{#if playbackError}
+						<Alert color="red" class="mt-4 text-left">{playbackError}</Alert>
+					{/if}
+					<Button
+						class="mt-4 w-full"
+						disabled={!selectedDeviceId || retryingPlayback}
+						onclick={retryPlayback}
+					>
+						{#if retryingPlayback}
+							<Spinner size="4" class="me-2" />
+						{/if}
+						Try again
+					</Button>
+				{:else if pauseReason === 'playback-failed'}
+					<p class="text-slate-400">Waiting for the host to fix Spotify playback...</p>
+					<Spinner size="8" class="mt-4" />
+				{:else}
+					<p class="text-slate-400">Waiting for the host to reconnect...</p>
+					<Spinner size="8" class="mt-4" />
+				{/if}
 			</div>
 		{:else if gameStarted}
 			<!-- Game playing state -->
@@ -725,31 +786,13 @@
 			{#if isHost}
 				<section class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
 					<h3 class="mb-2 text-sm font-medium text-white">Spotify Device</h3>
-					{#if loadingDevices}
-						<div class="flex items-center gap-2 text-slate-400">
-							<Spinner size="4" />
-							<span class="text-sm">Loading devices...</span>
-						</div>
-					{:else if devices.length === 0}
-						<p class="text-sm text-slate-400">No devices found.</p>
-						<Button color="alternative" size="xs" class="mt-2" onclick={loadDevices}>
-							Refresh
-						</Button>
-					{:else}
-						<select
-							class="w-full rounded-lg border-slate-600 bg-slate-800 text-sm text-white focus:border-purple-500 focus:ring-purple-500"
-							value={selectedDeviceId}
-							onchange={handleDeviceChange}
-						>
-							<option value="">Select a device...</option>
-							{#each devices as device (device.id)}
-								<option value={device.id}>{device.name}</option>
-							{/each}
-						</select>
-						<Button color="alternative" size="xs" class="mt-2" onclick={loadDevices}>
-							Refresh
-						</Button>
-					{/if}
+					<DevicePicker
+						{devices}
+						{selectedDeviceId}
+						loading={loadingDevices}
+						onSelect={handleDeviceSelect}
+						onRefresh={loadDevices}
+					/>
 				</section>
 			{/if}
 

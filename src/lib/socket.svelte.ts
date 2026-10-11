@@ -337,8 +337,10 @@ export interface GameOverData {
 	coWinners?: string[];
 }
 
+export type PauseReason = 'host-disconnected' | 'playback-failed';
+
 export interface GamePausedData {
-	reason: string;
+	reason: PauseReason;
 }
 
 export interface ScorecardSummary {
@@ -367,6 +369,7 @@ export interface GameStateSyncData {
 	readyCount: number;
 	totalCount: number;
 	gamePaused: boolean;
+	pauseReason: PauseReason | null;
 	roundNumber: number;
 	roundPhase: string | null;
 	category: CategoryInfo | null;
