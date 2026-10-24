@@ -1,6 +1,6 @@
-# Base: Node 24 with bun
-FROM node:24-slim AS base
-RUN npm install -g bun
+# Base: Node 26 with bun
+FROM node:26-slim AS base
+RUN npm install -g bun@1.4.4
 WORKDIR /app
 
 # Dependencies: cached layer, only rebuilds when lockfile changes
@@ -21,7 +21,7 @@ COPY package.json bun.lock .npmrc ./
 RUN bun install --frozen-lockfile --production
 
 # Production: minimal image with just the build output
-FROM node:24-alpine AS production
+FROM node:26-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
